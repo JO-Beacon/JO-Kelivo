@@ -1,10 +1,11 @@
 import 'dart:async';
+import '../../../core/models/reasoning_request.dart';
 import 'dart:convert';
 
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 import '../../../core/models/assistant.dart';
-import '../../../core/models/model_types.dart';
+import '../../../core/models/model_spec.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/environment_provider.dart';
 import '../../../core/providers/mcp_provider.dart';
@@ -13,7 +14,8 @@ import '../../../core/providers/memory_provider_v2.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/tts_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
-import '../../../core/services/api/chat_api_helpers.dart' show effectiveModelInfo;
+import '../../../core/services/api/chat_api_helpers.dart'
+    show effectiveModelInfo;
 import '../../../core/services/api/json_schema_utils.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/mcp/mcp_tool_service.dart';
@@ -664,15 +666,15 @@ class ToolHandlerService {
     final mdlId = settings.memoryModelId;
     if (provKey != null && mdlId != null) {
       final cfg = settings.getProviderConfig(provKey);
-      final budget = settings.memoryModelThinkingEnabled
-          ? (assistant.thinkingBudget)
-          : 0;
+      final reasoning = settings.memoryModelThinkingEnabled
+          ? (assistant.reasoning ?? ReasoningRequest.auto)
+          : ReasoningRequest.off;
       memoryLlmCall = (prompt) => ChatApiService.generateText(
         conversationId: conversationId,
         config: cfg,
         modelId: mdlId,
         prompt: prompt,
-        thinkingBudget: budget,
+        reasoning: reasoning,
       );
     }
 

@@ -14,6 +14,7 @@ import '../../builtin_tools.dart';
 import '../../chat_api_helpers.dart';
 import '../../tool_result_content.dart';
 import '../../../model_spec/model_spec_resolver.dart';
+import '../../reasoning/reasoning_dialects.dart';
 import '../../generation/tool_loop_runner.dart';
 import '../../../auth/claude_oauth_request.dart';
 import '../../google_service_account_auth.dart';
@@ -78,6 +79,7 @@ Stream<StreamChunk> sendClaudeStreamEvents(
   List<Map<String, dynamic>> messages, {
   List<String>? userImagePaths,
   int? thinkingBudget,
+  ReasoningRequest reasoning = ReasoningRequest.auto,
   double? temperature,
   double? topP,
   int? maxTokens,
@@ -100,10 +102,6 @@ Stream<StreamChunk> sendClaudeStreamEvents(
       ? _vertexClaudeUrl(config, upstreamModelId, stream: stream)
       : Uri.parse('$base/messages');
 
-  final isReasoning = effectiveModelInfo(
-    config,
-    modelId,
-  ).abilities.contains(ModelAbility.reasoning);
   final skipRedactedThinkingBlocks = BuiltInToolsHelper.isOpenRouterProvider(
     config,
   );
@@ -383,29 +381,6 @@ Stream<StreamChunk> sendClaudeStreamEvents(
   yield* runProviderToolRounds(
     retryRound: retryRound,
     sendRound: () async* {
-      final omitSamplingParams = claudeShouldOmitSamplingParams(
-        upstreamModelId,
-        thinkingBudget,
-      );
-      final compatibleTopP = claudeCompatibleTopP(
-        upstreamModelId,
-        thinkingBudget,
-        topP,
-      );
-      final thinkingModelId = config.oauthProvider == OAuthProvider.kimi
-          ? modelId
-          : upstreamModelId;
-      final thinking = isReasoning
-          ? claudeThinkingConfig(
-              thinkingModelId,
-              thinkingBudget,
-              config: config,
-            )
-          : null;
-      final outputConfig = isReasoning
-          ? claudeOutputConfig(thinkingModelId, thinkingBudget, config: config)
-          : null;
-
       // 每轮单独准备请求体
       totalUsage = null;
       final spec = ModelSpecResolver.instance.spec(config, modelId);
@@ -420,21 +395,30 @@ Stream<StreamChunk> sendClaudeStreamEvents(
           'cache_control': ProviderConfig.claudePromptCacheControl(
             config.claudePromptCachingTtl,
           ),
-        if (!omitSamplingParams &&
-            !isClaudeReasoningEnabled(thinkingBudget) &&
-            temperature != null)
-          'temperature': temperature,
-        if (compatibleTopP != null) 'top_p': compatibleTopP,
+        if (temperature != null) 'temperature': temperature,
+        if (topP != null) 'top_p': topP,
         if (allTools.isNotEmpty) 'tools': allTools,
         if (allTools.isNotEmpty) 'tool_choice': {'type': 'auto'},
-        if (thinking != null) 'thinking': thinking,
-        if (outputConfig != null) 'output_config': outputConfig,
         if (hasCodeExecution && container != null) 'container': container!.id,
       };
+      // 推理与采样由 ModelSpec 方言决定；自定义 body 随后合并，用户设置优先。
+      applyReasoning(
+        body,
+        spec,
+        reasoning,
+        transport: ReasoningTransport.anthropicMessages,
+      );
+      applySamplingPolicy(
+        body,
+        spec,
+        resolveReasoning(spec, reasoning),
+        transport: ReasoningTransport.anthropicMessages,
+      );
       final extraClaude = customBody(config, modelId, assistantBody: extraBody);
       if (extraClaude.isNotEmpty) {
         body.addAll(extraClaude);
       }
+      applyAnthropicMessagesProtocolConstraints(body);
 
       http.Request buildRequest() {
         final request = http.Request('POST', url);

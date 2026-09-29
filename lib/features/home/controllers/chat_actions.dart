@@ -1,4 +1,7 @@
 import 'dart:async';
+import '../../../core/models/provider_oauth.dart';
+import '../services/context_usage_service.dart';
+import '../../../core/models/reasoning_request.dart';
 import 'dart:collection';
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
@@ -12,10 +15,10 @@ import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/markdown_media_sanitizer.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/models/conversation_tree.dart';
-import '../../../core/models/token_usage.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
+import '../../../core/services/api/reasoning/reasoning_selection.dart';
 import '../../../core/services/api/retry_policy.dart';
 import '../../../core/services/api/stream/stream_chunk.dart';
 import '../../../core/services/backup/data_sync.dart';
@@ -158,6 +161,7 @@ class ChatActions {
     required this.messageGenerationService,
     required this.contextProvider,
     required this.viewModel,
+    this.contextUsage,
     MobileBackgroundCoordinator? backgroundCoordinator,
   }) : _background =
            backgroundCoordinator ?? MobileBackgroundCoordinator.instance {
@@ -259,6 +263,7 @@ class ChatActions {
   final GenerationController generationController;
   final MessageGenerationService messageGenerationService;
   final BuildContext contextProvider;
+  final ContextUsageService? contextUsage;
 
   // ============================================================================
   // UI 更新回调（由 HomeViewModel 设置）
@@ -528,14 +533,6 @@ class ChatActions {
     );
   }
 
-  /// 自 [start] 起经过的毫秒数；未知或设备时钟回拨导致差值为负时
-  /// 为 null（message_rows 的 CHECK 约束会拒绝负持续时间）。
-  int? _elapsedMsFrom(DateTime? start) {
-    if (start == null) return null;
-    final elapsed = DateTime.now().difference(start).inMilliseconds;
-    return elapsed < 0 ? null : elapsed;
-  }
-
   ChatMessage _streamingMessageSnapshot(stream_ctrl.StreamingState state) {
     final messageId = state.messageId;
     final index = _messages.indexWhere((message) => message.id == messageId);
@@ -545,11 +542,14 @@ class ChatActions {
     return base.copyWith(
       parts: _assistantPartsForState(state),
       totalTokens: state.totalTokens,
-      promptTokens: state.usage?.promptTokens,
-      completionTokens: state.usage?.completionTokens,
-      cachedTokens: state.usage?.cachedTokens,
-      // copyWith keeps base.durationMs when this resolves to null.
-      durationMs: _elapsedMsFrom(state.streamStartedAt),
+      promptTokens: state.totalUsage?.promptTokens,
+      completionTokens: state.totalUsage?.completionTokens,
+      cachedTokens: state.totalUsage?.cachedTokens,
+      reasoningTokens: state.totalUsage?.reasoningTokens,
+      cacheWriteTokens: state.totalUsage?.cacheWriteTokens,
+      finishUsage: state.usage,
+      durationMs: state.durationMs,
+      firstTokenMs: state.firstTokenMs,
     );
   }
 
@@ -889,8 +889,22 @@ class ChatActions {
     return generationController.isReasoningModel(providerKey, modelId);
   }
 
-  bool _isReasoningEnabled(int? budget) {
-    return messageGenerationService.isReasoningEnabled(budget);
+  bool _isReasoningEnabled(ReasoningRequest request) {
+    return messageGenerationService.isReasoningEnabled(request);
+  }
+
+  ReasoningRequest _selectedReasoning({
+    required SettingsProvider settings,
+    required String providerKey,
+    required String modelId,
+    Assistant? assistant,
+  }) {
+    return selectReasoningRequest(
+      settings: settings,
+      config: settings.getProviderConfig(providerKey),
+      modelId: modelId,
+      assistant: assistant,
+    );
   }
 
   Conversation _conversationForMessageContext(
@@ -943,11 +957,15 @@ class ChatActions {
   Future<void> debugHandleStreamChunk(
     StreamChunk chunk,
     stream_ctrl.StreamingState state,
-  ) => _handleStreamChunk(chunk, state);
+  ) {
+    state.recordFirstOutput(chunk);
+    return _handleStreamChunk(chunk, state);
+  }
 
   @visibleForTesting
   static StreamSubscription<T> listenSequentiallyToStream<T>({
     required Stream<T> stream,
+    void Function(T chunk)? onReceived,
     required Future<void> Function(T chunk) onData,
     required Future<void> Function(Object error, StackTrace stackTrace) onError,
     required Future<void> Function() onDone,
@@ -1038,6 +1056,8 @@ class ChatActions {
     sourceSubscription = stream.listen(
       (chunk) {
         if (terminalQueued) return;
+        // 同步到达观察者必须排在异步队列之前运行。
+        onReceived?.call(chunk);
         enqueue((data: chunk, error: null, stackTrace: null, done: false));
       },
       onError: (Object error, StackTrace stackTrace) {
@@ -1352,7 +1372,15 @@ class ChatActions {
       streamController.toolParts.remove(assistantMessage.id);
       final supportsReasoning = _isReasoningModel(providerKey, modelId);
       final enableReasoning =
-          supportsReasoning && _isReasoningEnabled(assistant?.thinkingBudget);
+          supportsReasoning &&
+          _isReasoningEnabled(
+            _selectedReasoning(
+              settings: settings,
+              providerKey: providerKey,
+              modelId: modelId,
+              assistant: assistant,
+            ),
+          );
       _bindFileProcessingCallbacks();
       await messageGenerationService.initializeReasoningState(
         messageId: assistantMessage.id,
@@ -1700,7 +1728,15 @@ class ChatActions {
       // 初始化推理
       final supportsReasoning = _isReasoningModel(providerKey, modelId);
       final enableReasoning =
-          supportsReasoning && _isReasoningEnabled(assistant?.thinkingBudget);
+          supportsReasoning &&
+          _isReasoningEnabled(
+            _selectedReasoning(
+              settings: settings,
+              providerKey: providerKey,
+              modelId: modelId,
+              assistant: assistant,
+            ),
+          );
       _bindFileProcessingCallbacks();
       try {
         await messageGenerationService.initializeReasoningState(
@@ -1856,7 +1892,15 @@ class ChatActions {
 
     final supportsReasoning = _isReasoningModel(providerKey, modelId);
     final enableReasoning =
-        supportsReasoning && _isReasoningEnabled(assistant?.thinkingBudget);
+        supportsReasoning &&
+        _isReasoningEnabled(
+          _selectedReasoning(
+            settings: settings,
+            providerKey: providerKey,
+            modelId: modelId,
+            assistant: assistant,
+          ),
+        );
 
     _bindFileProcessingCallbacks();
     try {
@@ -1988,6 +2032,8 @@ class ChatActions {
     if (visibleStreaming != null) {
       streamController.markStreamingEnded(visibleStreaming.id);
       streamController.cleanupTimers(visibleStreaming.id);
+      final cancelState = _streamingStates[visibleStreaming.id];
+      cancelState?.finishRequestTiming();
       // 取消时清除自动重试倒计时。
       streamController.streamingContentNotifier.updateRetryStatus(
         visibleStreaming.id,
@@ -2143,7 +2189,12 @@ class ChatActions {
         modelId: ctx.modelId,
         messages: ctx.apiMessages,
         userImagePaths: ctx.userImagePaths,
-        thinkingBudget: assistant?.thinkingBudget,
+        reasoning: selectReasoningRequest(
+          settings: ctx.settings,
+          config: ctx.config,
+          modelId: ctx.modelId,
+          assistant: assistant,
+        ),
         temperature: assistant?.temperature,
         topP: assistant?.topP,
         maxTokens: assistant?.maxTokens,
@@ -2167,8 +2218,10 @@ class ChatActions {
         ChatApiService.cancelRequest(conversationId);
         await _cancelSubscriptionWithTimeout(previousSub);
       }
+      state.requestStartedAt = DateTime.now();
       final sub = listenSequentiallyToStream<StreamChunk>(
         stream: stream,
+        onReceived: state.recordFirstOutput,
         onData: (chunk) => _handleStreamChunk(chunk, state),
         onError: (error, stackTrace) => _handleStreamError(error, state),
         onDone: () => _handleStreamDone(state),
@@ -2230,8 +2283,9 @@ class ChatActions {
       case ServerToolEnd() || ToolCallResult() || Annotations():
         await _handleToolResultsChunk(chunk, state);
         _scheduleStreamingCheckpoint(state);
-      case Usage(:final usage):
-        _applyUsage(state, usage);
+      case Usage():
+        _applyUsage(state);
+        _scheduleStreamingCheckpoint(state);
       case ProviderArtifact(:final kind, :final payload):
         await chatService.setProviderArtifact(state.messageId, kind, payload);
       case Finish():
@@ -2253,9 +2307,9 @@ class ChatActions {
     }
   }
 
-  void _applyUsage(stream_ctrl.StreamingState state, TokenUsage usage) {
-    state.usage = (state.usage ?? const TokenUsage()).merge(usage);
-    state.totalTokens = state.usage!.totalTokens;
+  void _applyUsage(stream_ctrl.StreamingState state) {
+    state.usage = state.partsHandler.usage;
+    state.totalTokens = state.totalUsage?.totalTokens ?? 0;
   }
 
   Future<void> _markGenerationStreaming(
@@ -2371,7 +2425,6 @@ class ChatActions {
     final conversationId = state.conversationId;
 
     _recordContent(state, chunkContent);
-    state.streamStartedAt ??= DateTime.now();
 
     // 正文开始时结束当前思考片段。
     if (state.ctx.streamOutput && chunkContent.isNotEmpty) {
@@ -2392,10 +2445,10 @@ class ChatActions {
         partsBuilder: (visibleText) =>
             _assistantPartsForState(state, visibleText: visibleText),
         totalTokens: state.totalTokens,
-        promptTokens: state.usage?.promptTokens,
-        completionTokens: state.usage?.completionTokens,
-        cachedTokens: state.usage?.cachedTokens,
-        durationMs: _elapsedMsFrom(state.streamStartedAt),
+        promptTokens: state.totalUsage?.promptTokens,
+        completionTokens: state.totalUsage?.completionTokens,
+        cachedTokens: state.totalUsage?.cachedTokens,
+        durationMs: state.durationMs,
         updateMessageInList: (id, content, tokens) {
           onContentUpdated?.call(id, content, tokens);
         },
@@ -2422,6 +2475,7 @@ class ChatActions {
 
   /// 处理流完成（isDone == true）。
   Future<void> _handleStreamFinish(stream_ctrl.StreamingState state) async {
+    state.finishRequestTiming();
     final messageId = state.messageId;
     final conversationId = state.conversationId;
     final autoCollapseThinking =
@@ -2472,6 +2526,8 @@ class ChatActions {
     stream_ctrl.StreamingState state, {
     bool generateTitle = true,
   }) async {
+    // 冻结计时：后面的快照与持久化都读同一个时间点。
+    state.finishRequestTiming();
     final messageId = state.messageId;
     final conversationId = state.conversationId;
 
@@ -2503,10 +2559,10 @@ class ChatActions {
     final processedContent = _transformAssistantContent(state);
 
     // 计算最终持续时间
-    final finalDurationMs = _elapsedMsFrom(state.streamStartedAt);
-    final finalPromptTokens = state.usage?.promptTokens;
-    final finalCompletionTokens = state.usage?.completionTokens;
-    final finalCachedTokens = state.usage?.cachedTokens;
+    final finalDurationMs = state.durationMs;
+    final finalPromptTokens = state.totalUsage?.promptTokens;
+    final finalCompletionTokens = state.totalUsage?.completionTokens;
+    final finalCachedTokens = state.totalUsage?.cachedTokens;
 
     // 在异步操作前将最终内容刷新到流式通知器。
     // 这样任何中间重建（例如 isProcessingFiles 变化或
@@ -2537,6 +2593,24 @@ class ChatActions {
       cachedTokens: finalCachedTokens,
       durationMs: finalDurationMs,
     );
+    // 把本轮的精确用量锚定到刚结束时的那份上下文；不阻塞回复入库。
+    final usageService = contextUsage;
+    final settledUsage = state.usage;
+    if (usageService != null && settledUsage != null) {
+      final scopedAssistant = state.ctx.assistant;
+      unawaited(
+        usageService.recordUsage(
+          conversationId: conversationId,
+          providerKey: state.ctx.providerKey,
+          modelId: state.ctx.modelId,
+          assistantId: scopedAssistant is Assistant ? scopedAssistant.id : null,
+          usage: settledUsage,
+          assistantMessage: finalizedMessage,
+          requestConfiguration: state.ctx.contextUsageConfiguration,
+          requestRevision: state.ctx.contextUsageRevision,
+        ),
+      );
+    }
     try {
       await _finalizeStreamingCheckpoint(
         finalizedMessage,
@@ -2600,7 +2674,13 @@ class ChatActions {
     )) {
       return;
     }
-    final errorText = e.toString();
+    // 先冻结计时，后面的快照与持久化都读同一个时间点。
+    state.finishRequestTiming();
+    // 账号登录失效是可识别状态，不该当成普通生成失败。
+    final oauthFailure =
+        e is ProviderOAuthException &&
+        e.kind == ProviderOAuthFailure.loginRequired;
+    final errorText = oauthFailure ? '' : e.toString();
 
     // 出错时只清理当前助手消息的处理指示器。
     onFileProcessingFinished?.call(messageId);
@@ -2618,6 +2698,13 @@ class ChatActions {
       partialContent: partialContent,
       errorText: errorText,
     );
+    if (oauthFailure) {
+      final providerId =
+          e.providerId ?? _streamingMessageSnapshot(state).providerId;
+      if (providerId != null) {
+        errorParts.add(ProviderAuthErrorPart(providerId: providerId));
+      }
+    }
     final errorMessage = _streamingMessageSnapshot(state).copyWith(
       parts: errorParts,
       totalTokens: state.totalTokens,
@@ -2627,7 +2714,7 @@ class ChatActions {
       await _finalizeStreamingCheckpoint(
         errorMessage,
         terminalState: GenerationRunState.failed,
-        errorCode: 'generation_failed',
+        errorCode: oauthFailure ? 'oauth_login_required' : 'generation_failed',
       );
       state.terminalPersisted = true;
     } finally {
@@ -2645,7 +2732,8 @@ class ChatActions {
       // 此处再次进入其屏障取消会等待当前处理器本身，
       // 并阻止下方 UI 错误回调触发。
       _conversationStreams.remove(conversationId);
-      onStreamError?.call(errorText);
+      // 账号登录失效走专用恢复入口，不当成普通错误提示。
+      if (!oauthFailure) onStreamError?.call(errorText);
       onStreamFinished?.call(conversationId);
       await _finishIosBackgroundGeneration(
         _backgroundTaskId(state.ctx),
@@ -2657,6 +2745,7 @@ class ChatActions {
 
   /// 处理流完成回调。
   Future<void> _handleStreamDone(stream_ctrl.StreamingState state) async {
+    state.finishRequestTiming();
     final conversationId = state.conversationId;
     final messageId = state.messageId;
 

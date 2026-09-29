@@ -119,18 +119,9 @@ bool _isAihubmix(ProviderConfig cfg) {
   return base.contains('aihubmix.com');
 }
 
-// 按模型覆盖解析有效模型信息。现在由 ModelSpec 解析器派生，
-// 旧调用点仍拿到兼容的 [ModelInfo] 视图。
-ModelInfo effectiveModelInfo(ProviderConfig cfg, String modelId) {
-  final spec = ModelSpecResolver.instance.spec(cfg, modelId);
-  return ModelInfo(
-    id: modelId,
-    displayName: spec.displayName,
-    type: spec.type,
-    input: spec.input,
-    output: spec.output,
-    abilities: spec.abilities,
-  );
+// 按模型覆盖解析有效模型规格。由 ModelSpec 解析器给出。
+ModelSpec effectiveModelInfo(ProviderConfig cfg, String modelId) {
+  return ModelSpecResolver.instance.spec(cfg, modelId);
 }
 
 String mimeFromPath(String path) {
@@ -994,4 +985,41 @@ void _throwOnInBandStreamError(Object? error) {
   if (error is String && error.trim().isNotEmpty) {
     throw HttpException('Provider error: ${error.trim()}');
   }
+}
+
+/// Anthropic Messages 协议的硬约束，在自定义 body 合并之后执行：
+/// 开启思考（enabled / adaptive）时不允许 temperature / top_k，top_p 仅接受
+/// 0.95 到 1.0；预算不得大于等于 max_tokens（保留下限 1024）。
+void applyAnthropicMessagesProtocolConstraints(Map<String, dynamic> body) {
+  final thinking = body['thinking'];
+  if (thinking is! Map) return;
+  final type = thinking['type']?.toString();
+  if (type != 'enabled' && type != 'adaptive') return;
+
+  body.remove('temperature');
+  body.remove('top_k');
+
+  final topP = body['top_p'];
+  if (topP is num && (topP < 0.95 || topP > 1.0)) {
+    body.remove('top_p');
+  }
+
+  if (type != 'enabled') return;
+
+  final rawBudget = thinking['budget_tokens'];
+  final rawMax = body['max_tokens'];
+  final budget = rawBudget is int
+      ? rawBudget
+      : rawBudget is num
+      ? rawBudget.toInt()
+      : null;
+  final maxTokens = rawMax is int
+      ? rawMax
+      : rawMax is num
+      ? rawMax.toInt()
+      : null;
+  if (budget == null || maxTokens == null || budget < maxTokens) return;
+  var next = maxTokens - 1024;
+  if (next < 1024) next = 1024;
+  thinking['budget_tokens'] = next;
 }

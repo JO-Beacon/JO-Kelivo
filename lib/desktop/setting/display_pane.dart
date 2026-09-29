@@ -84,11 +84,15 @@ class _DisplaySettingsBody extends StatelessWidget {
                   _RowDivider(),
                   _ToggleRowShowTokenStats(),
                   _RowDivider(),
+                  _ToggleRowShowTotalTokens(),
+                  _RowDivider(),
                   _ToggleRowShowThinkingCards(),
                   _RowDivider(),
                   _ToggleRowShowToolCards(),
                   _RowDivider(),
                   _ToggleRowShowProducedFiles(),
+                  _RowDivider(),
+                  _ToggleRowShowReasoningLevelBadge(),
                 ],
               ),
               const SizedBox(height: 16),
@@ -2421,6 +2425,21 @@ class _ToggleRowShowTokenStats extends StatelessWidget {
   }
 }
 
+class _ToggleRowShowTotalTokens extends StatelessWidget {
+  const _ToggleRowShowTotalTokens();
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final sp = context.watch<SettingsProvider>();
+    return _ToggleRow(
+      label: l10n.displaySettingsPageShowTotalTokensTitle,
+      tip: l10n.displaySettingsPageShowTotalTokensSubtitle,
+      value: sp.showTotalTokens,
+      onChanged: (v) => context.read<SettingsProvider>().setShowTotalTokens(v),
+    );
+  }
+}
+
 class _ToggleRowShowProviderInCapsule extends StatelessWidget {
   const _ToggleRowShowProviderInCapsule();
   @override
@@ -2568,6 +2587,22 @@ class _ToggleRowShowProducedFiles extends StatelessWidget {
       value: sp.showProducedFiles,
       onChanged: (v) =>
           context.read<SettingsProvider>().setShowProducedFiles(v),
+    );
+  }
+}
+
+class _ToggleRowShowReasoningLevelBadge extends StatelessWidget {
+  const _ToggleRowShowReasoningLevelBadge();
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final sp = context.watch<SettingsProvider>();
+    return _ToggleRow(
+      label: l10n.displaySettingsPageShowReasoningLevelBadgeTitle,
+      tip: l10n.displaySettingsPageShowReasoningLevelBadgeSubtitle,
+      value: sp.showReasoningLevelBadge,
+      onChanged: (v) =>
+          context.read<SettingsProvider>().setShowReasoningLevelBadge(v),
     );
   }
 }

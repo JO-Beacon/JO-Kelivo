@@ -3,6 +3,7 @@ import 'package:Kelivo/core/models/memory_entry.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/memory/legacy_memory_migration.dart';
 import 'package:Kelivo/core/services/memory/memory_repository.dart';
+import 'package:Kelivo/core/models/reasoning_request.dart';
 
 import '../../../support/business_test_harness.dart';
 
@@ -72,7 +73,7 @@ void main() {
               String? conversationId,
               required String modelId,
               required String prompt,
-              int? thinkingBudget,
+              ReasoningRequest? reasoning,
             }) async => '[{"id":1,"type":"identity"}]',
       );
 
@@ -104,7 +105,7 @@ void main() {
               String? conversationId,
               required String modelId,
               required String prompt,
-              int? thinkingBudget,
+              ReasoningRequest? reasoning,
             }) async => '[{"id":1,"type":"workflow","content":"整理后的措辞"}]',
       );
 
@@ -236,7 +237,7 @@ void main() {
                 String? conversationId,
                 required String modelId,
                 required String prompt,
-                int? thinkingBudget,
+                ReasoningRequest? reasoning,
               }) async {
                 generatorCalls++;
                 return '[{"id":1,"type":"identity","content":"Converted"}]';
@@ -303,7 +304,7 @@ void main() {
                 String? conversationId,
                 required String modelId,
                 required String prompt,
-                int? thinkingBudget,
+                ReasoningRequest? reasoning,
               }) async {
                 generatorCalls++;
                 return '[{"id":1,"type":"identity","content":"Already saved"}]';
@@ -359,7 +360,7 @@ void main() {
               String? conversationId,
               required String modelId,
               required String prompt,
-              int? thinkingBudget,
+              ReasoningRequest? reasoning,
             }) async {
               if (prompt.contains('First legacy memory')) {
                 firstCalls++;
@@ -424,7 +425,7 @@ void main() {
               String? conversationId,
               required String modelId,
               required String prompt,
-              int? thinkingBudget,
+              ReasoningRequest? reasoning,
             }) async {
               calls++;
               final hasFirst = prompt.contains('First split memory');
@@ -479,7 +480,7 @@ void main() {
                 String? conversationId,
                 required String modelId,
                 required String prompt,
-                int? thinkingBudget,
+                ReasoningRequest? reasoning,
               }) async {
                 calls++;
                 throw Exception('HTTP 401: invalid api key');

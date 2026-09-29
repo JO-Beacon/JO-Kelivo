@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 
-import '../../../../models/token_usage.dart';
 import '../../../../models/provider_oauth.dart';
 import '../../../../providers/settings_provider.dart';
 import '../../../../utils/openai_model_compat.dart';
@@ -401,25 +400,6 @@ void applyKimiCodeChatThinking(
   };
 }
 
-TokenUsage? openaiUsageFromObj(Map<String, dynamic> obj) {
-  try {
-    final u = obj['usage'];
-    if (u is! Map) return null;
-    final prompt = (u['prompt_tokens'] ?? 0) as int? ?? 0;
-    final completion = (u['completion_tokens'] ?? 0) as int? ?? 0;
-    final cached =
-        (u['prompt_tokens_details']?['cached_tokens'] ?? 0) as int? ?? 0;
-    return TokenUsage(
-      promptTokens: prompt,
-      completionTokens: completion,
-      cachedTokens: cached,
-      totalTokens: prompt + completion,
-    );
-  } catch (_) {
-    return null;
-  }
-}
-
 String openAIEffortForBudget(int? budget, String upstreamModelId) {
   final baseEffort = effortForBudget(budget);
   var requestedEffort = baseEffort;
@@ -564,33 +544,6 @@ void maybeAddStreamingUsageOptions(
   if (shouldIncludeStreamingUsageOptions(host)) {
     body['stream_options'] = {'include_usage': true};
   }
-}
-
-int _readOpenAIUsageInt(dynamic value) {
-  if (value is num) return value.toInt();
-  if (value is String) return int.tryParse(value) ?? 0;
-  return 0;
-}
-
-TokenUsage? mergeOpenAICompatibleUsage(TokenUsage? current, dynamic rawUsage) {
-  if (rawUsage is! Map) return current;
-
-  final details =
-      rawUsage['prompt_tokens_details'] ?? rawUsage['input_tokens_details'];
-  final cachedTokens = details is Map
-      ? _readOpenAIUsageInt(details['cached_tokens'])
-      : 0;
-  return (current ?? const TokenUsage()).merge(
-    TokenUsage(
-      promptTokens: _readOpenAIUsageInt(
-        rawUsage['prompt_tokens'] ?? rawUsage['input_tokens'],
-      ),
-      completionTokens: _readOpenAIUsageInt(
-        rawUsage['completion_tokens'] ?? rawUsage['output_tokens'],
-      ),
-      cachedTokens: cachedTokens,
-    ),
-  );
 }
 
 Stream<String> rethrowFollowUpStreamErrors(Stream<String> source) {

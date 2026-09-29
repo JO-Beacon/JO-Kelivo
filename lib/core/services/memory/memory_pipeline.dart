@@ -1,3 +1,4 @@
+import '../../models/reasoning_request.dart';
 import 'dart:async';
 import 'dart:collection';
 
@@ -83,7 +84,7 @@ class MemoryPipelineService {
       required String modelId,
       required String prompt,
       String? conversationId,
-      int? thinkingBudget,
+      ReasoningRequest? reasoning,
     })?
     generateText,
   }) : traceRecorder = traceRecorder ?? MemoryTraceRecorder.instance,
@@ -102,14 +103,14 @@ class MemoryPipelineService {
     required String modelId,
     required String prompt,
     String? conversationId,
-    int? thinkingBudget,
+    ReasoningRequest? reasoning,
   }) {
     return ChatApiService.generateText(
       conversationId: conversationId,
       config: config,
       modelId: modelId,
       prompt: prompt,
-      thinkingBudget: thinkingBudget,
+      reasoning: reasoning,
     );
   }
 
@@ -130,7 +131,7 @@ class MemoryPipelineService {
     required String modelId,
     required String prompt,
     String? conversationId,
-    int? thinkingBudget,
+    ReasoningRequest? reasoning,
   })
   _generateText;
 
@@ -493,9 +494,9 @@ class MemoryPipelineService {
     if (watermark == -1 && window.length > firstWindowCap) {
       window = window.sublist(window.length - firstWindowCap);
     }
-    final thinkingBudget = settings.memoryModelThinkingEnabled
-        ? (assistant.thinkingBudget)
-        : 0;
+    final reasoning = settings.memoryModelThinkingEnabled
+        ? (assistant.reasoning ?? ReasoningRequest.auto)
+        : ReasoningRequest.off;
 
     return processWindow(
       conversationId: job.conversationId,
@@ -509,7 +510,7 @@ class MemoryPipelineService {
         config: cfg,
         modelId: mdlId,
         prompt: prompt,
-        thinkingBudget: thinkingBudget,
+        reasoning: reasoning,
       ),
     );
   }

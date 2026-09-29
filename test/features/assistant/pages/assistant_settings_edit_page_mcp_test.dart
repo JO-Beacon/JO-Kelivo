@@ -24,6 +24,7 @@ import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_switch.dart';
 import 'package:Kelivo/shared/widgets/snackbar.dart';
+import 'package:Kelivo/core/models/reasoning_request.dart';
 
 class _FakePathProviderPlatform extends PathProviderPlatform {
   _FakePathProviderPlatform(this.path);
@@ -102,7 +103,7 @@ _createAssistantProvider(WidgetTester tester) async {
           conversationId,
           required modelId,
           required prompt,
-          int? thinkingBudget,
+          ReasoningRequest? reasoning,
         }) async => '<user_memory>false</user_memory>',
   );
   return (

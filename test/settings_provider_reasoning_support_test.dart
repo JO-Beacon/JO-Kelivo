@@ -4,6 +4,10 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/core/providers/model_provider.dart';
+import 'package:Kelivo/core/models/assistant.dart';
+import 'package:Kelivo/core/models/model_spec.dart';
+import 'package:Kelivo/core/models/reasoning_request.dart';
+import 'package:Kelivo/core/services/model_spec/model_defaults_guesser.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 
 void main() {
@@ -55,18 +59,10 @@ void main() {
     });
 
     test('latest model ids infer only their documented capabilities', () {
-      final glm = ModelRegistry.infer(
-        ModelInfo(id: 'glm-5.2', displayName: 'glm-5.2'),
-      );
-      final kimiK2 = ModelRegistry.infer(
-        ModelInfo(id: 'kimi-k2.7-code', displayName: 'kimi-k2.7-code'),
-      );
-      final kimiK3 = ModelRegistry.infer(
-        ModelInfo(id: 'kimi-k3', displayName: 'kimi-k3'),
-      );
-      final muse = ModelRegistry.infer(
-        ModelInfo(id: 'muse-spark-1.1', displayName: 'muse-spark-1.1'),
-      );
+      final glm = ModelDefaultsGuesser.guess('glm-5.2');
+      final kimiK2 = ModelDefaultsGuesser.guess('kimi-k2.7-code');
+      final kimiK3 = ModelDefaultsGuesser.guess('kimi-k3');
+      final muse = ModelDefaultsGuesser.guess('muse-spark-1.1');
 
       expect(glm.input, const [Modality.text]);
       expect(glm.output, const [Modality.text]);
@@ -82,9 +78,6 @@ void main() {
           containsAll([ModelAbility.tool, ModelAbility.reasoning]),
         );
       }
-      expect(kimiK2.id, 'kimi-k2.7-code');
-      expect(kimiK3.id, 'kimi-k3');
-      expect(muse.id, 'muse-spark-1.1');
     });
 
     test('OpenRouter can be routed through Anthropic format explicitly', () {
@@ -105,6 +98,13 @@ void main() {
     });
 
     group('title generation thinking', () {
+      final reasoning1024 = ReasoningRequest(
+        ReasoningLevel.low,
+        budgetTokens: 1024,
+      );
+      Assistant assistantWith(ReasoningRequest r) =>
+          Assistant(id: 'a', name: 'a', reasoning: r);
+
       test('defaults to disabled', () async {
         final harness = await createBusinessTestHarness(
           initial: {'thinking_budget_v1': 16000},
@@ -114,8 +114,14 @@ void main() {
         await settings.loaded;
 
         expect(settings.titleGenerationThinkingEnabled, isFalse);
-        expect(settings.titleGenerationThinkingBudgetFor(null), 0);
-        expect(settings.titleGenerationThinkingBudgetFor(1024), 0);
+        expect(
+          settings.titleGenerationReasoningFor(null),
+          ReasoningRequest.off,
+        );
+        expect(
+          settings.titleGenerationReasoningFor(assistantWith(reasoning1024)),
+          ReasoningRequest.off,
+        );
       });
 
       test(
@@ -129,8 +135,14 @@ void main() {
           await settings.setTitleGenerationThinkingEnabled(false);
 
           expect(settings.titleGenerationThinkingEnabled, isFalse);
-          expect(settings.titleGenerationThinkingBudgetFor(null), 0);
-          expect(settings.titleGenerationThinkingBudgetFor(1024), 0);
+          expect(
+            settings.titleGenerationReasoningFor(null),
+            ReasoningRequest.off,
+          );
+          expect(
+            settings.titleGenerationReasoningFor(assistantWith(reasoning1024)),
+            ReasoningRequest.off,
+          );
 
           final prefs = harness.preferences;
           expect(
@@ -149,7 +161,10 @@ void main() {
         await settings.loaded;
 
         expect(settings.titleGenerationThinkingEnabled, isFalse);
-        expect(settings.titleGenerationThinkingBudgetFor(32000), 0);
+        expect(
+          settings.titleGenerationReasoningFor(assistantWith(reasoning1024)),
+          ReasoningRequest.off,
+        );
       });
 
       test('reset restores disabled default', () async {
@@ -165,7 +180,10 @@ void main() {
         await settings.resetTitleGenerationThinkingEnabled();
 
         expect(settings.titleGenerationThinkingEnabled, isFalse);
-        expect(settings.titleGenerationThinkingBudgetFor(null), 0);
+        expect(
+          settings.titleGenerationReasoningFor(null),
+          ReasoningRequest.off,
+        );
 
         final prefs = harness.preferences;
         expect(prefs.getBool('title_generation_thinking_enabled_v1'), isFalse);
@@ -181,11 +199,34 @@ void main() {
 
           await settings.loaded;
 
-          expect(settings.summaryGenerationThinkingBudgetFor(1024), 0);
-          expect(settings.suggestionGenerationThinkingBudgetFor(1024), 0);
-          expect(settings.compressGenerationThinkingBudgetFor(1024), 0);
-          expect(settings.translateGenerationThinkingBudgetFor(1024), 0);
-          expect(settings.ocrGenerationThinkingBudgetFor(1024), 0);
+          expect(
+            settings.summaryGenerationReasoningFor(
+              assistantWith(reasoning1024),
+            ),
+            ReasoningRequest.off,
+          );
+          expect(
+            settings.suggestionGenerationReasoningFor(
+              assistantWith(reasoning1024),
+            ),
+            ReasoningRequest.off,
+          );
+          expect(
+            settings.compressGenerationReasoningFor(
+              assistantWith(reasoning1024),
+            ),
+            ReasoningRequest.off,
+          );
+          expect(
+            settings.translateGenerationReasoningFor(
+              assistantWith(reasoning1024),
+            ),
+            ReasoningRequest.off,
+          );
+          expect(
+            settings.ocrGenerationReasoningFor(assistantWith(reasoning1024)),
+            ReasoningRequest.off,
+          );
 
           await settings.setSummaryGenerationThinkingEnabled(true);
           await settings.setSuggestionGenerationThinkingEnabled(true);
@@ -195,11 +236,32 @@ void main() {
 
           // 全局思考预算已废弃：助手没设档位就是「自动」，不再有第二处兜底。
           // 备份里残留的 thinking_budget_v1 也不再被 SettingsProvider 读取。
-          expect(settings.summaryGenerationThinkingBudgetFor(null), isNull);
-          expect(settings.suggestionGenerationThinkingBudgetFor(1024), 1024);
-          expect(settings.compressGenerationThinkingBudgetFor(1024), 1024);
-          expect(settings.translateGenerationThinkingBudgetFor(1024), 1024);
-          expect(settings.ocrGenerationThinkingBudgetFor(1024), 1024);
+          expect(
+            settings.summaryGenerationReasoningFor(null),
+            ReasoningRequest.auto,
+          );
+          expect(
+            settings.suggestionGenerationReasoningFor(
+              assistantWith(reasoning1024),
+            ),
+            reasoning1024,
+          );
+          expect(
+            settings.compressGenerationReasoningFor(
+              assistantWith(reasoning1024),
+            ),
+            reasoning1024,
+          );
+          expect(
+            settings.translateGenerationReasoningFor(
+              assistantWith(reasoning1024),
+            ),
+            reasoning1024,
+          );
+          expect(
+            settings.ocrGenerationReasoningFor(assistantWith(reasoning1024)),
+            reasoning1024,
+          );
           expect(
             harness.preferences.getBool(
               'summary_generation_thinking_enabled_v1',

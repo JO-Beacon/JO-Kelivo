@@ -1,4 +1,5 @@
 import 'chat_message.dart';
+import '../utils/token_estimator.dart';
 import '../../utils/utf16_safe_cut.dart';
 
 enum CompressContextLimitMode { start, recent, unlimited, keepRecent }
@@ -114,30 +115,11 @@ class CompressionTokenEstimate {
   final int maxResultTokens;
 }
 
-bool _isCjkRune(int rune) {
-  return (rune >= 0x2E80 && rune <= 0x9FFF) ||
-      (rune >= 0xF900 && rune <= 0xFAFF) ||
-      (rune >= 0xFF00 && rune <= 0xFFEF);
-}
-
-int _estimateCharsToTokens(String text) {
-  var cjk = 0;
-  var other = 0;
-  for (final rune in text.runes) {
-    if (_isCjkRune(rune)) {
-      cjk++;
-    } else {
-      other++;
-    }
-  }
-  return (cjk / 1.6 + other / 4).round();
-}
-
 CompressionTokenEstimate estimateCompressionTokens({
   required String totalText,
   required String keptText,
 }) {
-  final totalTokens = _estimateCharsToTokens(totalText);
+  final totalTokens = estimateTokens(totalText);
   if (totalText.isEmpty) {
     return const CompressionTokenEstimate(
       totalTokens: 0,
@@ -185,25 +167,6 @@ int compressionRequestCharBudget({
     budget = budget < options.maxChars! ? budget : options.maxChars!;
   }
   return budget.clamp(512, 64000);
-}
-
-int? parseContextWindow(Map<String, dynamic> override) {
-  const keys = <String>[
-    'contextWindow',
-    'context_window',
-    'contextLength',
-    'context_length',
-    'maxContextTokens',
-    'max_context_tokens',
-    'inputTokenLimit',
-    'input_token_limit',
-  ];
-  for (final key in keys) {
-    final value = override[key];
-    final parsed = value is num ? value.toInt() : int.tryParse('$value');
-    if (parsed != null && parsed > 0) return parsed;
-  }
-  return null;
 }
 
 List<String> chunkPlainTexts(List<String> texts, int maxCodeUnits) {

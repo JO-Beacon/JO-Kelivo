@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-import '../../core/models/model_types.dart';
+import '../../core/models/model_spec.dart';
 import '../../icons/lucide_adapter.dart';
 import '../../l10n/app_localizations.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
@@ -13,7 +13,7 @@ import 'package:Kelivo/theme/app_font_weights.dart';
 class ModelTagWrap extends StatelessWidget {
   const ModelTagWrap({super.key, required this.model});
 
-  final ModelInfo model;
+  final ModelSpec model;
 
   Widget _abilityChip({
     required bool isDark,
@@ -260,7 +260,7 @@ class ModelCapsulesRow extends StatelessWidget {
     this.itemSpacing = 4,
   });
 
-  final ModelInfo model;
+  final ModelSpec model;
   final double iconSize;
   final EdgeInsets pillPadding;
   final double bgOpacityDark;

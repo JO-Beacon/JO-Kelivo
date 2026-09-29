@@ -40,6 +40,14 @@ class WorldBookProvider with ChangeNotifier {
   bool isBookActive(String id, {String? assistantId}) =>
       activeBookIdsFor(assistantId).contains(id);
 
+  /// 当前选中且启用的世界书；用量估算与实际注入共用。
+  List<WorldBook> activeBooksFor(String? assistantId, {List<String>? bookIds}) {
+    final ids = (bookIds ?? activeBookIdsFor(assistantId)).toSet();
+    return _books
+        .where((book) => book.enabled && ids.contains(book.id))
+        .toList(growable: false);
+  }
+
   bool isBookCollapsed(String id) => _collapsedBooks[id] ?? false;
 
   Future<void> initialize() {

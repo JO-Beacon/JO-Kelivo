@@ -1,4 +1,6 @@
 import '../../../core/services/scheduled_tasks_service.dart';
+import '../services/context_usage_service.dart';
+import '../../../core/models/reasoning_request.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -12,10 +14,10 @@ import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/chat/chat_service.dart';
+import '../../../core/services/model_spec/model_spec_resolver.dart';
 import '../../../core/services/logging/flutter_logger.dart';
 import '../../../core/services/memory/memory_pipeline.dart';
 import '../../../core/services/memory/memory_trace.dart';
-import '../../../core/services/model_override_payload_parser.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../chat/widgets/chat_message_widget.dart' show ToolUIPart;
 import '../services/message_builder_service.dart';
@@ -76,6 +78,7 @@ class HomeViewModel extends ChangeNotifier {
     required this._chatController,
     required this._contextProvider,
     required this.getTitleForLocale,
+    this.contextUsage,
   }) {
     // 初始化 ChatActions
     _chatActions = ChatActions(
@@ -86,6 +89,7 @@ class HomeViewModel extends ChangeNotifier {
       messageGenerationService: _messageGenerationService,
       contextProvider: _contextProvider,
       viewModel: this,
+      contextUsage: contextUsage,
     );
 
     // 连接回调
@@ -107,7 +111,13 @@ class HomeViewModel extends ChangeNotifier {
   // 依赖
   // ============================================================================
 
+  /// 用量环跟随当前会话：切换会话时立刻把活动会话换过去。
+  void _syncContextUsageConversation(String? conversationId) {
+    contextUsage?.setActiveConversation(conversationId);
+  }
+
   final ChatService _chatService;
+  final ContextUsageService? contextUsage;
   // ignore: unused_field - Reserved for future use (direct message building)
   final MessageBuilderService _messageBuilderService;
   // ignore: unused_field - Reserved for future use (direct generation control)
@@ -947,6 +957,7 @@ class HomeViewModel extends ChangeNotifier {
     if (currentConversation?.id == id) return;
 
     _chatService.setCurrentConversation(id);
+    _syncContextUsageConversation(id);
     final convo = _chatService.getConversation(id);
     if (convo != null) {
       // 助手偏好持久化与窗口加载并发运行；
@@ -998,6 +1009,7 @@ class HomeViewModel extends ChangeNotifier {
   void commitConversationSwitch(PreparedConversationSwitch prepared) {
     final id = prepared.conversation.id;
     _chatService.setCurrentConversation(id);
+    _syncContextUsageConversation(id);
     _chatController.commitConversationWindow(prepared.window);
     // 与 switchConversation 相同的并发情况：助手变化会在其磁盘写入
     // 完成前通知。
@@ -1358,17 +1370,11 @@ class HomeViewModel extends ChangeNotifier {
     if (provKey == null || mdlId == null) return 'no_model';
 
     final cfg = settings.getProviderConfig(provKey);
-    final budget = settings.compressGenerationThinkingBudgetFor(
-      assistant?.thinkingBudget,
-    );
+    final reasoning = settings.compressGenerationReasoningFor(assistant);
 
-    final modelOverride = ModelOverridePayloadParser.modelOverride(
-      cfg.modelOverrides,
-      mdlId,
-    );
     final requestBudget = compressionRequestCharBudget(
       options: options,
-      contextWindow: parseContextWindow(modelOverride),
+      contextWindow: ModelSpecResolver.instance.spec(cfg, mdlId).contextWindow,
     );
     final chunks = buildCompressRequestContents(
       summarizeMessages,
@@ -1386,7 +1392,7 @@ class HomeViewModel extends ChangeNotifier {
         config: cfg,
         modelId: mdlId,
         prompt: prompt,
-        thinkingBudget: budget,
+        reasoning: reasoning,
         skipImageParsing: true,
       );
     }
@@ -1424,6 +1430,7 @@ class HomeViewModel extends ChangeNotifier {
         );
 
         _chatService.setCurrentConversation(newConvo.id);
+        _syncContextUsageConversation(newConvo.id);
         await _chatController.setCurrentConversationAndLoad(
           _chatService.getConversation(newConvo.id) ?? newConvo,
         );
@@ -1448,6 +1455,7 @@ class HomeViewModel extends ChangeNotifier {
 
       // 切换到新会话
       _chatService.setCurrentConversation(newConvo.id);
+      _syncContextUsageConversation(newConvo.id);
       await _chatController.setCurrentConversationAndLoad(
         _chatService.getConversation(newConvo.id) ?? newConvo,
       );
@@ -1632,9 +1640,7 @@ class HomeViewModel extends ChangeNotifier {
     if (titleModelProvider == null || titleModelId == null) return;
 
     final cfg = settings.getProviderConfig(titleModelProvider);
-    final budget = settings.titleGenerationThinkingBudgetFor(
-      assistant?.thinkingBudget,
-    );
+    final reasoning = settings.titleGenerationReasoningFor(assistant);
     final locale = Localizations.localeOf(_contextProvider).toLanguageTag();
 
     // 从消息构建内容（与侧边抽屉标题路径共享；
@@ -1651,7 +1657,7 @@ class HomeViewModel extends ChangeNotifier {
         config: cfg,
         modelId: titleModelId,
         prompt: prompt,
-        thinkingBudget: budget,
+        reasoning: reasoning,
       )).trim();
       if (title.isNotEmpty) {
         await _chatService.renameConversation(convo.id, title);
@@ -1703,9 +1709,7 @@ class HomeViewModel extends ChangeNotifier {
         ? assistantProvider.getById(convo.assistantId!)
         : assistantProvider.currentAssistant;
 
-    final budget = settings.summaryGenerationThinkingBudgetFor(
-      assistant?.thinkingBudget,
-    );
+    final reasoning = settings.summaryGenerationReasoningFor(assistant);
 
     final legacy = settings.legacyMemoryMode;
     if (legacy) {
@@ -1792,7 +1796,7 @@ class HomeViewModel extends ChangeNotifier {
         config: cfg,
         modelId: mdlId,
         prompt: prompt,
-        thinkingBudget: budget,
+        reasoning: reasoning,
       )).trim();
       traceStep?.appendResponse(summary);
 
@@ -1901,9 +1905,7 @@ class HomeViewModel extends ChangeNotifier {
     final mdlId = settings.suggestionModelId ?? chatModel.modelId;
     if (provKey == null || mdlId == null) return;
     final locale = Localizations.localeOf(_contextProvider).toLanguageTag();
-    final budget = settings.suggestionGenerationThinkingBudgetFor(
-      assistant?.thinkingBudget,
-    );
+    final reasoning = settings.suggestionGenerationReasoningFor(assistant);
 
     // 本次请求的代次标记：任一入口条件变了，结果都不再作数。
     final request = Object();
@@ -1940,7 +1942,7 @@ class HomeViewModel extends ChangeNotifier {
         messages: msgs,
         truncateIndex: truncateIndex,
         locale: locale,
-        thinkingBudget: budget,
+        reasoning: reasoning,
       );
       // 返回空数组是一个有效决定：就是不提供建议。
       if (suggestions.isEmpty || !isCurrent()) return;
@@ -1994,8 +1996,8 @@ class HomeViewModel extends ChangeNotifier {
     return _generationController.isToolModel(providerKey, modelId);
   }
 
-  bool isReasoningEnabled(int? budget) {
-    return _generationController.isReasoningEnabled(budget);
+  bool isReasoningEnabled(ReasoningRequest request) {
+    return _generationController.isReasoningEnabled(request);
   }
 
   // ============================================================================

@@ -136,7 +136,7 @@ class OcrService {
       modelId: model,
       messages: messages,
       userImagePaths: imagePaths,
-      thinkingBudget: settings.ocrGenerationThinkingBudgetFor(null),
+      reasoning: settings.ocrGenerationReasoningFor(null),
       topP: null,
       maxTokens: null,
       tools: null,

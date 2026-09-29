@@ -24,6 +24,7 @@ import '../models/auto_retry_options.dart';
 import '../models/backup.dart';
 import '../models/compress_context_options.dart';
 import '../models/provider_group.dart';
+import '../models/assistant.dart';
 import '../models/reasoning_request.dart';
 import '../models/tool_schema_override.dart';
 import '../services/app_exit_flush.dart';
@@ -201,6 +202,10 @@ class SettingsProvider extends ChangeNotifier {
   static const String _displayShowToolCardsKey = 'display_show_tool_cards_v1';
   static const String _displayShowProducedFilesKey =
       'display_show_produced_files_v1';
+  static const String _displayShowReasoningLevelBadgeKey =
+      'display_show_reasoning_level_badge_v1';
+  static const String _displayShowTotalTokensKey =
+      'display_show_total_tokens_v1';
   static const String _displayAutoCollapseThinkingKey =
       'display_auto_collapse_thinking_v1';
   static const String _displayCollapseThinkingStepsKey =
@@ -984,6 +989,10 @@ class SettingsProvider extends ChangeNotifier {
     _showThinkingCards = prefs.getBool(_displayShowThinkingCardsKey) ?? true;
     _showToolCards = prefs.getBool(_displayShowToolCardsKey) ?? true;
     _showProducedFiles = prefs.getBool(_displayShowProducedFilesKey) ?? true;
+    // 与上游有意分歧：上游该项默认关，本仓库默认开。
+    _showReasoningLevelBadge =
+        prefs.getBool(_displayShowReasoningLevelBadgeKey) ?? true;
+    _showTotalTokens = prefs.getBool(_displayShowTotalTokensKey) ?? false;
     _autoCollapseThinking =
         prefs.getBool(_displayAutoCollapseThinkingKey) ?? true;
     _collapseThinkingSteps =
@@ -4412,47 +4421,28 @@ Requirements:
   Future<void> resetLegacyMemoryPromptEn() async =>
       setLegacyMemoryPromptEn(MemoryPrompts.legacyRulesEn);
 
-  int? titleGenerationThinkingBudgetFor(int? assistantBudget) {
-    return _backgroundThinkingBudgetFor(
-      _titleGenerationThinkingEnabled,
-      assistantBudget,
-    );
+  ReasoningRequest titleGenerationReasoningFor(Assistant? assistant) {
+    return _backgroundReasoningFor(_titleGenerationThinkingEnabled, assistant);
   }
 
-  int? summaryGenerationThinkingBudgetFor(int? assistantBudget) =>
-      _backgroundThinkingBudgetFor(
-        _summaryGenerationThinkingEnabled,
-        assistantBudget,
-      );
+  ReasoningRequest summaryGenerationReasoningFor(Assistant? assistant) =>
+      _backgroundReasoningFor(_summaryGenerationThinkingEnabled, assistant);
 
-  int? suggestionGenerationThinkingBudgetFor(int? assistantBudget) =>
-      _backgroundThinkingBudgetFor(
-        _suggestionGenerationThinkingEnabled,
-        assistantBudget,
-      );
+  ReasoningRequest suggestionGenerationReasoningFor(Assistant? assistant) =>
+      _backgroundReasoningFor(_suggestionGenerationThinkingEnabled, assistant);
 
-  int? compressGenerationThinkingBudgetFor(int? assistantBudget) =>
-      _backgroundThinkingBudgetFor(
-        _compressGenerationThinkingEnabled,
-        assistantBudget,
-      );
+  ReasoningRequest compressGenerationReasoningFor(Assistant? assistant) =>
+      _backgroundReasoningFor(_compressGenerationThinkingEnabled, assistant);
 
-  int? translateGenerationThinkingBudgetFor(int? assistantBudget) =>
-      _backgroundThinkingBudgetFor(
-        _translateGenerationThinkingEnabled,
-        assistantBudget,
-      );
+  ReasoningRequest translateGenerationReasoningFor(Assistant? assistant) =>
+      _backgroundReasoningFor(_translateGenerationThinkingEnabled, assistant);
 
-  int? ocrGenerationThinkingBudgetFor(int? assistantBudget) =>
-      _backgroundThinkingBudgetFor(
-        _ocrGenerationThinkingEnabled,
-        assistantBudget,
-      );
+  ReasoningRequest ocrGenerationReasoningFor(Assistant? assistant) =>
+      _backgroundReasoningFor(_ocrGenerationThinkingEnabled, assistant);
 
-  int? _backgroundThinkingBudgetFor(bool enabled, int? assistantBudget) {
-    if (!enabled) return 0;
-    // 助手没设档位就是「自动」；全局预算已废弃，不再有第二处兜底。
-    return assistantBudget;
+  ReasoningRequest _backgroundReasoningFor(bool enabled, Assistant? assistant) {
+    if (!enabled) return ReasoningRequest.off;
+    return assistant?.reasoning ?? ReasoningRequest.auto;
   }
 
   AutoRetryOptions _autoRetry = const AutoRetryOptions.defaults().copyWith(
@@ -4622,6 +4612,26 @@ Requirements:
     _showProducedFiles = v;
     notifyListeners();
     await _preferences.setBool(_displayShowProducedFilesKey, v);
+  }
+
+  // 显示：输入栏推理按钮上的当前档位文字。
+  bool _showReasoningLevelBadge = true;
+  bool get showReasoningLevelBadge => _showReasoningLevelBadge;
+  Future<void> setShowReasoningLevelBadge(bool v) async {
+    if (_showReasoningLevelBadge == v) return;
+    _showReasoningLevelBadge = v;
+    notifyListeners();
+    await _preferences.setBool(_displayShowReasoningLevelBadgeKey, v);
+  }
+
+  // 仅影响展示：统计始终用整轮用量。
+  bool _showTotalTokens = false;
+  bool get showTotalTokens => _showTotalTokens;
+  Future<void> setShowTotalTokens(bool v) async {
+    if (_showTotalTokens == v) return;
+    _showTotalTokens = v;
+    notifyListeners();
+    await _preferences.setBool(_displayShowTotalTokensKey, v);
   }
 
   // 显示：自动折叠推理/思考部分
@@ -5735,6 +5745,8 @@ Requirements:
     copy._showThinkingCards = _showThinkingCards;
     copy._showToolCards = _showToolCards;
     copy._showProducedFiles = _showProducedFiles;
+    copy._showReasoningLevelBadge = _showReasoningLevelBadge;
+    copy._showTotalTokens = _showTotalTokens;
     copy._autoCollapseThinking = _autoCollapseThinking;
     copy._collapseThinkingSteps = _collapseThinkingSteps;
     copy._showToolResultSummary = _showToolResultSummary;

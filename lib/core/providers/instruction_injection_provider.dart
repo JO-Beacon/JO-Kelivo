@@ -35,6 +35,16 @@ class InstructionInjectionProvider with ChangeNotifier {
   bool isActive(String id, {String? assistantId}) =>
       activeIdsFor(assistantId).contains(id);
 
+  /// 选中指令的提示文本，按当前选择顺序拼接；用量估算与实际注入共用。
+  String promptFor(String? assistantId, {List<String>? instructionIds}) {
+    final ids = (instructionIds ?? activeIdsFor(assistantId)).toSet();
+    return _items
+        .where((item) => ids.contains(item.id))
+        .map((item) => item.prompt.trim())
+        .where((prompt) => prompt.isNotEmpty)
+        .join('\n\n');
+  }
+
   List<InstructionInjection> get actives => activesFor(null);
 
   List<InstructionInjection> activesFor(String? assistantId) {

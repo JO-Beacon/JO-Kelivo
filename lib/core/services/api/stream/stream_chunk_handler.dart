@@ -38,6 +38,15 @@ class StreamChunkHandler {
   final Map<String, StringBuffer> _imageBuffers = <String, StringBuffer>{};
 
   TokenUsage? usage;
+  TokenUsage? _completedUsage;
+  TokenUsage? _resultTotalUsage;
+
+  /// 本轮所有 API 请求的合计；[usage] 仍只代表最后一次请求。
+  TokenUsage? get totalUsage =>
+      _resultTotalUsage ??
+      (_completedUsage == null
+          ? usage
+          : _completedUsage! + (usage ?? const TokenUsage()));
   dynamic reasoningDetails;
   bool finished = false;
   String? finishReason;
@@ -75,6 +84,7 @@ class StreamChunkHandler {
           if (!_isBlankPart(part)) part,
       ],
       usage: usage,
+      totalUsage: totalUsage,
       finishReason: finishReason,
       reasoningDetails: reasoningDetails,
     );
@@ -107,6 +117,7 @@ class StreamChunkHandler {
     if (result.usage != null) {
       usage = (usage ?? const TokenUsage()).merge(result.usage!);
     }
+    _resultTotalUsage = result.totalUsage;
     if (result.reasoningDetails != null) {
       reasoningDetails = result.reasoningDetails;
     }
@@ -275,7 +286,14 @@ class StreamChunkHandler {
           content: _mergeSearchItems(existing?.content, items),
           server: true,
         );
-      case Usage(:final usage):
+      case Usage(:final usage, :final startsRequest):
+        if (startsRequest) {
+          if (this.usage != null) {
+            _completedUsage =
+                (_completedUsage ?? const TokenUsage()) + this.usage!;
+          }
+          this.usage = null;
+        }
         this.usage = (this.usage ?? const TokenUsage()).merge(usage);
       case final RetryPending pending:
         onRetry?.call(pending);

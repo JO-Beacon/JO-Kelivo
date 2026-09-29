@@ -1,3 +1,4 @@
+import '../../models/reasoning_request.dart';
 import 'dart:convert';
 import 'dart:math';
 
@@ -63,7 +64,7 @@ typedef LegacyMemoryTextGenerator =
       required ProviderConfig config,
       required String modelId,
       required String prompt,
-      int? thinkingBudget,
+      ReasoningRequest? reasoning,
     });
 
 class LegacyMemoryMigrationService {
@@ -341,7 +342,7 @@ class LegacyMemoryMigrationService {
         ids: ids,
         template: promptTemplate,
       ),
-      thinkingBudget: 0,
+      reasoning: ReasoningRequest.off,
     );
     final converted = parseResponse(
       response,

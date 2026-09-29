@@ -177,8 +177,8 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
         messages: [
           {'role': 'user', 'content': prompt},
         ],
-        thinkingBudget: settings.translateGenerationThinkingBudgetFor(
-          context.read<AssistantProvider>().currentAssistant?.thinkingBudget,
+        reasoning: settings.translateGenerationReasoningFor(
+          context.read<AssistantProvider>().currentAssistant,
         ),
         requestId: _requestId,
         parseMarkdownImageLinks: settings.sendMarkdownImageLinksAsImages,

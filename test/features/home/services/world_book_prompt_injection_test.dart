@@ -7,6 +7,8 @@ import 'package:Kelivo/features/home/controllers/stream_controller.dart'
 import 'package:Kelivo/core/services/mcp/mcp_tool_service.dart';
 import 'package:Kelivo/core/services/workspace/workspace_tools_service.dart';
 import 'package:Kelivo/core/services/logging/context_logger.dart';
+import 'package:Kelivo/core/services/logging/context_log_models.dart'
+    show kelivoContextSegmentsKey;
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/features/home/widgets/conversation_system_prompt_button.dart';
 import 'package:flutter/material.dart';
@@ -92,6 +94,14 @@ class _Generation extends Fake implements GenerationController {
     WorkspaceToolContext? workspaceContext,
     String? conversationId,
   }) => [];
+}
+
+/// 断言注入结果时去掉内部分段标记：它服务于上下文用量统计，
+/// 不属于对外的消息结构。
+Map<String, dynamic> withoutTags(Map<String, dynamic> message) {
+  final copy = Map<String, dynamic>.from(message);
+  copy.remove(kelivoContextSegmentsKey);
+  return copy;
 }
 
 void main() {
@@ -435,7 +445,10 @@ void main() {
           'model',
           conversation: scenario.$2,
         );
-        expect(messages.first, {'role': 'system', 'content': scenario.$3});
+        expect(withoutTags(messages.first), {
+          'role': 'system',
+          'content': scenario.$3,
+        });
         expect(messages, hasLength(2));
       }
       final decoded = Assistant.fromJson(
@@ -659,9 +672,12 @@ void main() {
         ];
         await builder.injectWorldBookPrompts(messages, 'assistant');
         expect(messages.first['content'], 'BEFORE\nBASE\nAFTER');
-        expect(messages[1], {'role': 'assistant', 'content': 'TOP'});
+        expect(withoutTags(messages[1]), {
+          'role': 'assistant',
+          'content': 'TOP',
+        });
         expect(messages[messages.length - 2]['content'], contains('BOTTOM'));
-        expect(messages.last, {'role': 'user', 'content': 'hello'});
+        expect(withoutTags(messages.last), {'role': 'user', 'content': 'hello'});
       });
     },
   );

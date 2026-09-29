@@ -26,7 +26,6 @@ import '../../../core/services/chat/document_text_extractor.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../core/services/chat/prompt_transformer.dart';
 import '../../../core/services/logging/context_log_models.dart';
-import '../../../core/services/logging/context_logger.dart';
 import '../../../core/services/memory/memory_block_builder.dart';
 import '../../../core/services/memory/memory_prompts.dart';
 import '../../../core/models/skills_binding.dart';
@@ -309,6 +308,9 @@ class MessageBuilderService {
     required List<ChatMessage> messages,
     required Conversation? currentConversation,
     bool includeToolMessages = false,
+
+    /// 上游并行版本选择模型保留参数：本仓库活动分支已由消息树表达。
+    Map<String, int>? versionSelections,
   }) {
     final tIndex = currentConversation?.truncateIndex ?? -1;
     final List<ChatMessage> sourceAll =
@@ -389,21 +391,19 @@ class MessageBuilderService {
               // 如果也把它们附加到这条合成的工具前助手消息，就会重复
               // 回放同一段推理，而 OpenRouter/Anthropic 会拒绝。
               // 只有下方最终助手消息才携带它们。
-              if (ContextLogger.enabled) {
+              ContextSegmentTags.replaceWithSingle(
+                assistantToolMessage,
+                source: ContextSource.toolCall,
+                length: (assistantToolMessage['content'] ?? '')
+                    .toString()
+                    .length,
+              );
+              for (final toolMessage in toolMessages) {
                 ContextSegmentTags.replaceWithSingle(
-                  assistantToolMessage,
-                  source: ContextSource.toolCall,
-                  length: (assistantToolMessage['content'] ?? '')
-                      .toString()
-                      .length,
+                  toolMessage,
+                  source: ContextSource.toolResult,
+                  length: (toolMessage['content'] ?? '').toString().length,
                 );
-                for (final toolMessage in toolMessages) {
-                  ContextSegmentTags.replaceWithSingle(
-                    toolMessage,
-                    source: ContextSource.toolResult,
-                    length: (toolMessage['content'] ?? '').toString().length,
-                  );
-                }
               }
               out.add(assistantToolMessage);
               out.addAll(toolMessages);
@@ -453,13 +453,11 @@ class MessageBuilderService {
       if (reasoningDetails != null) {
         message['reasoning_details'] = reasoningDetails;
       }
-      if (ContextLogger.enabled) {
-        ContextSegmentTags.replaceWithSingle(
-          message,
-          source: ContextSource.chatHistory,
-          length: content.length,
-        );
-      }
+      ContextSegmentTags.replaceWithSingle(
+        message,
+        source: ContextSource.chatHistory,
+        length: content.length,
+      );
       out.add(message);
     }
 
@@ -803,6 +801,9 @@ class MessageBuilderService {
     List<ChatMessage>? sourceMessages,
     bool sandboxDataFiles = false,
     Map<String, AttachmentInfo> workspaceAttachments = const {},
+
+    /// 预览模式：读冻结提示词、解析记忆，但不跑 OCR、不提取文档、不写 extras。
+    bool previewOnly = false,
   }) async {
     final bool ocrActive =
         settings.ocrEnabled &&
@@ -841,7 +842,7 @@ class MessageBuilderService {
 
     // 只为仍需生成（尚未冻结）的消息预取 OCR。
     OcrPrepareSession? ocrSession;
-    if (ocrActive && ocrPrefetch != null) {
+    if (!previewOnly && ocrActive && ocrPrefetch != null) {
       final revisionIds = <String>[];
       final allImagePaths = <String>{};
       for (final message in apiMessages) {
@@ -893,6 +894,7 @@ class MessageBuilderService {
     }
 
     Future<String?> readDocument(DocumentAttachment d) async {
+      if (previewOnly) return null;
       // 只解析一次，使缓存键和提取器共享同一绝对路径。
       // null 表示被拒绝（UNC/SMB），绝不回退到原始路径。
       final resolvedPath = SandboxPathResolver.resolveForIo(d.path);
@@ -1082,13 +1084,11 @@ class MessageBuilderService {
         final carriesSnapshot =
             existing.carriesMemorySnapshot && sendPayload == existing.payload;
         if (carriesSnapshot) snapshotRevisionIds.add(revisionId);
-        if (ContextLogger.enabled) {
-          _tagFrozenUserPrompt(
-            apiMessages[i],
-            payload: sendPayload,
-            carriesMemorySnapshot: carriesSnapshot,
-          );
-        }
+        _tagFrozenUserPrompt(
+          apiMessages[i],
+          payload: sendPayload,
+          carriesMemorySnapshot: carriesSnapshot,
+        );
         continue;
       }
 
@@ -1138,9 +1138,9 @@ class MessageBuilderService {
       }
 
       String merged = (filePrompts.toString() + cleanedUser).trim();
-      var canFreezePrompt = !leftToSandbox;
+      var canFreezePrompt = !previewOnly && !leftToSandbox;
 
-      if (ocrActive && ocrHandler != null) {
+      if (!previewOnly && ocrActive && ocrHandler != null) {
         final ocrTargets = parsedUser.imagePaths
             .map((p) => p.trim())
             .where(
@@ -1307,23 +1307,19 @@ class MessageBuilderService {
         if (wanted == null || wanted == split.prefix) continue;
         final refreshed = '$wanted${split.rest}';
         message['content'] = refreshed;
-        if (ContextLogger.enabled) {
-          _tagFrozenUserPrompt(
-            message,
-            payload: refreshed,
-            carriesMemorySnapshot: wanted.isNotEmpty,
-          );
-        }
+        _tagFrozenUserPrompt(
+          message,
+          payload: refreshed,
+          carriesMemorySnapshot: wanted.isNotEmpty,
+        );
         continue;
       }
       message['content'] = split.rest;
-      if (ContextLogger.enabled) {
-        ContextSegmentTags.replaceWithSingle(
-          message,
-          source: ContextSource.chatHistory,
-          length: split.rest.length,
-        );
-      }
+      ContextSegmentTags.replaceWithSingle(
+        message,
+        source: ContextSource.chatHistory,
+        length: split.rest.length,
+      );
     }
   }
 
@@ -1419,34 +1415,33 @@ class MessageBuilderService {
     }
     final finalContent = '${memory.prefix}$templated$timeSuffix';
 
-    if (ContextLogger.enabled) {
-      for (final apiMessage in apiMessages) {
-        if ((apiMessage[internalRevisionIdKey] ?? '').toString() !=
-            message.id) {
-          continue;
-        }
-        if (memory.prefix.isNotEmpty) {
-          final kind = memory.snapshotKind;
-          ContextSegmentTags.write(apiMessage, [
-            ContextSegmentTags.item(
-              source: ContextSource.memorySnapshot,
-              length: memory.prefix.length,
-              meta: kind == null ? null : {'kind': kind},
-            ),
-            ContextSegmentTags.item(
-              source: ContextSource.chatHistory,
-              length: finalContent.length - memory.prefix.length,
-            ),
-          ]);
-        } else {
-          ContextSegmentTags.replaceWithSingle(
-            apiMessage,
-            source: ContextSource.chatHistory,
-            length: finalContent.length,
-          );
-        }
-        break;
+    // 标记必须无条件写入：上下文用量统计靠这些标记分桶，
+    // 不能只在上下文日志开启时才写。
+    for (final apiMessage in apiMessages) {
+      if ((apiMessage[internalRevisionIdKey] ?? '').toString() != message.id) {
+        continue;
       }
+      if (memory.prefix.isNotEmpty) {
+        final kind = memory.snapshotKind;
+        ContextSegmentTags.write(apiMessage, [
+          ContextSegmentTags.item(
+            source: ContextSource.memorySnapshot,
+            length: memory.prefix.length,
+            meta: kind == null ? null : {'kind': kind},
+          ),
+          ContextSegmentTags.item(
+            source: ContextSource.chatHistory,
+            length: finalContent.length - memory.prefix.length,
+          ),
+        ]);
+      } else {
+        ContextSegmentTags.replaceWithSingle(
+          apiMessage,
+          source: ContextSource.chatHistory,
+          length: finalContent.length,
+        );
+      }
+      break;
     }
 
     // 临时草稿永远不会进入 message_rows；冻结会违反
@@ -1701,13 +1696,11 @@ class MessageBuilderService {
       );
       final sys = PromptTransformer.replacePlaceholders(prompt, vars);
       final sysMessage = <String, dynamic>{'role': 'system', 'content': sys};
-      if (ContextLogger.enabled) {
-        ContextSegmentTags.replaceWithSingle(
-          sysMessage,
-          source: ContextSource.systemPrompt,
-          length: sys.length,
-        );
-      }
+      ContextSegmentTags.replaceWithSingle(
+        sysMessage,
+        source: ContextSource.systemPrompt,
+        length: sys.length,
+      );
       apiMessages.insert(0, sysMessage);
     }
   }
@@ -1913,7 +1906,7 @@ class MessageBuilderService {
       _appendToSystemMessage(
         apiMessages,
         fragment,
-        source: ContextSource.instructionInjection,
+        source: ContextSource.workspace,
       );
     } catch (_) {}
   }
@@ -1950,7 +1943,7 @@ class MessageBuilderService {
       _appendToSystemMessage(
         apiMessages,
         fragment,
-        source: ContextSource.instructionInjection,
+        source: ContextSource.skills,
       );
     } catch (_) {}
   }
@@ -1964,6 +1957,7 @@ class MessageBuilderService {
     bool conversationScoped = false,
     List<ChatMessage>? sourceMessages,
     bool persistActivation = true,
+    void Function(int before, int after)? onActivationPersisted,
   }) async {
     try {
       List<WorldBook> all = const <WorldBook>[];
@@ -2052,6 +2046,7 @@ class MessageBuilderService {
           conversation != null &&
           ((result.state['effects'] as Map).isNotEmpty ||
               previous.isNotEmpty)) {
+        final before = chatService.contextRevision(conversation.id);
         await chatService.updateConversationExtras(conversation.id, (extras) {
           final next = Map<String, dynamic>.from(extras);
           if ((result.state['effects'] as Map).isEmpty) {
@@ -2061,6 +2056,10 @@ class MessageBuilderService {
           }
           return next;
         });
+        onActivationPersisted?.call(
+          before,
+          chatService.contextRevision(conversation.id),
+        );
       }
       final triggered = result.entries;
       if (triggered.isEmpty) return;
@@ -2095,14 +2094,12 @@ class MessageBuilderService {
                   'role': 'user',
                   'content': wrapSystemTag(merged),
                 };
-          if (ContextLogger.enabled) {
-            ContextSegmentTags.replaceWithSingle(
-              message,
-              source: ContextSource.worldBook,
-              length: (message['content'] ?? '').toString().length,
-              meta: {'position': position.toJson()},
-            );
-          }
+          ContextSegmentTags.replaceWithSingle(
+            message,
+            source: ContextSource.worldBook,
+            length: (message['content'] ?? '').toString().length,
+            meta: {'position': position.toJson()},
+          );
           result.add(message);
         }
         return result;
@@ -2151,30 +2148,28 @@ class MessageBuilderService {
             sb.write(afterContent);
           }
           apiMessages[systemIndex]['content'] = sb.toString();
-          if (ContextLogger.enabled) {
-            final sysMsg = apiMessages[systemIndex];
-            if (beforeContent.isNotEmpty) {
-              ContextSegmentTags.prepend(
-                sysMsg,
-                source: ContextSource.worldBook,
-                length: beforeContent.length + 1,
-                meta: {
-                  'position': WorldBookInjectionPosition.beforeSystemPrompt
-                      .toJson(),
-                },
-              );
-            }
-            if (afterContent.isNotEmpty) {
-              ContextSegmentTags.append(
-                sysMsg,
-                source: ContextSource.worldBook,
-                length: 1 + afterContent.length,
-                meta: {
-                  'position': WorldBookInjectionPosition.afterSystemPrompt
-                      .toJson(),
-                },
-              );
-            }
+          final sysMsg = apiMessages[systemIndex];
+          if (beforeContent.isNotEmpty) {
+            ContextSegmentTags.prepend(
+              sysMsg,
+              source: ContextSource.worldBook,
+              length: beforeContent.length + 1,
+              meta: {
+                'position': WorldBookInjectionPosition.beforeSystemPrompt
+                    .toJson(),
+              },
+            );
+          }
+          if (afterContent.isNotEmpty) {
+            ContextSegmentTags.append(
+              sysMsg,
+              source: ContextSource.worldBook,
+              length: 1 + afterContent.length,
+              meta: {
+                'position': WorldBookInjectionPosition.afterSystemPrompt
+                    .toJson(),
+              },
+            );
           }
         } else {
           final sb = StringBuffer();
@@ -2188,47 +2183,45 @@ class MessageBuilderService {
               'role': 'system',
               'content': sb.toString(),
             };
-            if (ContextLogger.enabled) {
-              if (beforeContent.isNotEmpty && afterContent.isNotEmpty) {
-                ContextSegmentTags.write(created, [
-                  ContextSegmentTags.item(
-                    source: ContextSource.worldBook,
-                    length: beforeContent.length + 1,
-                    meta: {
-                      'position': WorldBookInjectionPosition.beforeSystemPrompt
-                          .toJson(),
-                    },
-                  ),
-                  ContextSegmentTags.item(
-                    source: ContextSource.worldBook,
-                    length: afterContent.length,
-                    meta: {
-                      'position': WorldBookInjectionPosition.afterSystemPrompt
-                          .toJson(),
-                    },
-                  ),
-                ]);
-              } else if (beforeContent.isNotEmpty) {
-                ContextSegmentTags.replaceWithSingle(
-                  created,
+            if (beforeContent.isNotEmpty && afterContent.isNotEmpty) {
+              ContextSegmentTags.write(created, [
+                ContextSegmentTags.item(
                   source: ContextSource.worldBook,
-                  length: beforeContent.length,
+                  length: beforeContent.length + 1,
                   meta: {
                     'position': WorldBookInjectionPosition.beforeSystemPrompt
                         .toJson(),
                   },
-                );
-              } else {
-                ContextSegmentTags.replaceWithSingle(
-                  created,
+                ),
+                ContextSegmentTags.item(
                   source: ContextSource.worldBook,
                   length: afterContent.length,
                   meta: {
                     'position': WorldBookInjectionPosition.afterSystemPrompt
                         .toJson(),
                   },
-                );
-              }
+                ),
+              ]);
+            } else if (beforeContent.isNotEmpty) {
+              ContextSegmentTags.replaceWithSingle(
+                created,
+                source: ContextSource.worldBook,
+                length: beforeContent.length,
+                meta: {
+                  'position': WorldBookInjectionPosition.beforeSystemPrompt
+                      .toJson(),
+                },
+              );
+            } else {
+              ContextSegmentTags.replaceWithSingle(
+                created,
+                source: ContextSource.worldBook,
+                length: afterContent.length,
+                meta: {
+                  'position': WorldBookInjectionPosition.afterSystemPrompt
+                      .toJson(),
+                },
+              );
             }
             apiMessages.insert(0, created);
           }
@@ -2309,7 +2302,7 @@ class MessageBuilderService {
     if (apiMessages.isNotEmpty && apiMessages.first['role'] == 'system') {
       apiMessages[0]['content'] =
           '${(apiMessages[0]['content'] ?? '') as String}\n\n$content';
-      if (ContextLogger.enabled && source != null) {
+      if (source != null) {
         ContextSegmentTags.append(
           apiMessages[0],
           source: source,
@@ -2318,7 +2311,7 @@ class MessageBuilderService {
       }
     } else {
       final message = <String, dynamic>{'role': 'system', 'content': content};
-      if (ContextLogger.enabled && source != null) {
+      if (source != null) {
         ContextSegmentTags.append(
           message,
           source: source,

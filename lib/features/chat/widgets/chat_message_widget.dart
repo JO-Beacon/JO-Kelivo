@@ -39,7 +39,6 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../core/providers/settings_provider.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
-import '../../../core/providers/model_provider.dart';
 import '../../../core/models/assistant_regex.dart';
 import '../../../shared/widgets/custom_bottom_sheet.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
@@ -1426,10 +1425,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       }
     }
 
-    final inferred = ModelRegistry.infer(
-      ModelInfo(id: baseId, displayName: baseId),
-    );
-    final fallback = inferred.displayName.trim();
+    final fallback = baseId.trim();
     final displayName = fallback.isNotEmpty ? fallback : baseId;
     if (settings.showProviderInChatMessage &&
         providerName != null &&
@@ -2798,6 +2794,11 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     final showModelTimestamp = context.select<SettingsProvider, bool>(
       (s) => s.showModelTimestamp,
     );
+    // 关闭「整轮用量」时只显示最后一次请求的用量。
+    final showTotalTokens = context.select<SettingsProvider, bool>(
+      (s) => s.showTotalTokens,
+    );
+    final finishUsage = showTotalTokens ? null : widget.message.finishUsage;
     final enableAssistantMarkdown = context.select<SettingsProvider, bool>(
       (s) => s.enableAssistantMarkdown,
     );
@@ -3481,11 +3482,30 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                               widget.message.totalTokens != null) ...[
                             const Spacer(),
                             TokenDisplayWidget(
-                              totalTokens: widget.message.totalTokens!,
-                              promptTokens: widget.message.promptTokens,
-                              completionTokens: widget.message.completionTokens,
-                              cachedTokens: widget.message.cachedTokens,
+                              totalTokens:
+                                  finishUsage?.totalTokens ??
+                                  widget.message.totalTokens!,
+                              promptTokens:
+                                  finishUsage?.promptTokens ??
+                                  widget.message.promptTokens,
+                              completionTokens:
+                                  finishUsage?.completionTokens ??
+                                  widget.message.completionTokens,
+                              cachedTokens:
+                                  finishUsage?.cachedTokens ??
+                                  widget.message.cachedTokens,
                               durationMs: widget.message.durationMs,
+                              reasoningTokens:
+                                  finishUsage?.reasoningTokens ??
+                                  widget.message.reasoningTokens,
+                              cacheWriteTokens:
+                                  finishUsage?.cacheWriteTokens ??
+                                  widget.message.cacheWriteTokens,
+                              providerId: widget.message.providerId,
+                              modelId: widget.message.modelId,
+                              firstTokenMs: widget.message.firstTokenMs,
+                              totalCompletionTokens:
+                                  widget.message.completionTokens,
                             ),
                           ],
                         ],

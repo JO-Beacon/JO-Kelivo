@@ -61,6 +61,73 @@ Future<HttpServer> _dropConnectionServer(void Function() onRequest) async {
 }
 
 void main() {
+  test(
+    'non-stream usage is delivered before a later tool request fails',
+    () async {
+      var requests = 0;
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() => server.close(force: true));
+      server.listen((request) async {
+        requests++;
+        await request.drain<void>();
+        if (requests == 1) {
+          request.response.headers.contentType = ContentType.json;
+          request.response.write(
+            jsonEncode({
+              'choices': [
+                {
+                  'message': {
+                    'role': 'assistant',
+                    'tool_calls': [
+                      {
+                        'id': 'call-1',
+                        'type': 'function',
+                        'function': {'name': 'lookup', 'arguments': '{}'},
+                      },
+                    ],
+                  },
+                  'finish_reason': 'tool_calls',
+                },
+              ],
+              'usage': {'prompt_tokens': 100, 'completion_tokens': 20},
+            }),
+          );
+        } else {
+          request.response.statusCode = HttpStatus.serviceUnavailable;
+          request.response.write('unavailable');
+        }
+        await request.response.close();
+      });
+      final captured = StreamChunkHandler();
+      await expectLater(
+        ChatApiService.generateMessage(
+          config: _openAIConfig(
+            'http://${server.address.address}:${server.port}/v1',
+          ),
+          modelId: 'gpt-4o-mini',
+          messages: const [
+            {'role': 'user', 'content': 'look up'},
+          ],
+          tools: const [
+            {
+              'type': 'function',
+              'function': {
+                'name': 'lookup',
+                'parameters': {'type': 'object', 'properties': {}},
+              },
+            },
+          ],
+          onToolCall: (name, arguments, {toolCallId}) async => 'ok',
+          retryOverride: const AutoRetryOptions.defaults(),
+          onUsage: captured.handle,
+        ),
+        throwsA(isA<HttpException>()),
+      );
+      expect(requests, 2);
+      expect(captured.totalUsage!.totalTokens, 120);
+    },
+  );
+
   test('image generation does not retry status-less network errors', () async {
     var requests = 0;
     final server = await _dropConnectionServer(() => requests++);
@@ -180,23 +247,15 @@ void main() {
     });
     final baseUrl = 'http://${server.address.address}:${server.port}/v1';
     final pending = <RetryPending?>[];
-    // JO 无 generateMessage 聚合入口：改用事件链路的非流式模式，
-    // 手动聚合并观察 RetryPending / RetryAttemptStart 控制块。
-    final handler = StreamChunkHandler();
-    await for (final chunk in ChatApiService.sendMessageStream(
+    final result = await ChatApiService.generateMessage(
       config: _openAIConfig(baseUrl),
       modelId: 'gpt-4o-mini',
       messages: [
         {'role': 'user', 'content': 'hi'},
       ],
-      stream: false,
       retryOverride: _retryTwice(),
-    )) {
-      if (chunk is RetryPending) pending.add(chunk);
-      if (chunk is RetryAttemptStart) pending.add(null);
-      handler.handle(chunk);
-    }
-    final result = handler.toResult();
+      onRetry: pending.add,
+    );
     expect(requests, 2);
     expect(pending, hasLength(2));
     expect(pending.first, isA<RetryPending>());
@@ -260,13 +319,17 @@ void main() {
               ],
             };
       request.response.write('data: ${jsonEncode(data)}\n\n');
+      request.response.write(
+        'data: ${jsonEncode({
+          'choices': [],
+          'usage': {'prompt_tokens': requests == 1 ? 100 : 200, 'completion_tokens': requests == 1 ? 20 : 30},
+        })}\n\n',
+      );
       request.response.write('data: [DONE]\n\n');
       await request.response.close();
     });
     final baseUrl = 'http://${server.address.address}:${server.port}/v1';
 
-    // JO 双轨：带客户端工具的重试走事件链路（U10 每轮重试）；
-    // 旧版 sendMessageStream 保守规则（带工具不重试）保持不变。
     final chunks = await ChatApiService.sendMessageStream(
       config: _openAIConfig(baseUrl),
       modelId: 'gpt-4o-mini',
@@ -292,6 +355,9 @@ void main() {
 
     expect(requests, 3);
     expect(toolCalls, 1);
+    final result = StreamChunkHandler.collect(chunks);
+    expect(result.usage!.totalTokens, 230);
+    expect(result.totalUsage!.totalTokens, 350);
     expect(chunks.whereType<RetryPending>(), hasLength(1));
     expect(chunks.whereType<RetryAttemptStart>(), hasLength(1));
     expect(

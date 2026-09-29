@@ -73,7 +73,9 @@ void main() {
   });
 
   test(
-    'logger disabled leaves _kelivo_ctx_segments off buildApiMessages and injects',
+    // 分段标记不再受上下文日志开关控制：上下文用量统计要靠它分桶，
+    // 日志开关只决定是否记录日志。
+    'logger disabled still tags segments because usage counting needs them',
     () {
       final service = _service();
       final apiMessages = service.buildApiMessages(
@@ -91,7 +93,7 @@ void main() {
         false,
       );
 
-      expect(_hasSegmentsKey(apiMessages), isFalse);
+      expect(_hasSegmentsKey(apiMessages), isTrue);
     },
   );
 

@@ -14,6 +14,7 @@ import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/services/memory/memory_pipeline.dart';
 import 'package:Kelivo/core/services/memory/memory_repository.dart';
 import 'package:Kelivo/core/services/memory/memory_trace.dart';
+import 'package:Kelivo/core/models/reasoning_request.dart';
 import 'package:drift/drift.dart' show driftRuntimeOptions;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -137,7 +138,7 @@ void main() {
             String? conversationId,
             required String modelId,
             required String prompt,
-            int? thinkingBudget,
+            ReasoningRequest? reasoning,
           }) async =>
               throw StateError('use processWindow llmCall in these tests'),
     );

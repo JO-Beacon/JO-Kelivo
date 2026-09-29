@@ -23,6 +23,7 @@ import 'package:Kelivo/features/assistant/pages/assistant_settings_edit_page.dar
 import 'package:Kelivo/features/settings/pages/memory_settings_page.dart';
 import 'package:Kelivo/features/settings/widgets/memory_ui.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/core/models/reasoning_request.dart';
 
 import '../../../support/business_test_harness.dart';
 
@@ -110,7 +111,7 @@ _createProviders(WidgetTester tester) async {
           conversationId,
           required modelId,
           required prompt,
-          int? thinkingBudget,
+          ReasoningRequest? reasoning,
         }) async => '<user_memory>false</user_memory>',
   );
   return (assistantProvider, chatService, memoryV2, pipeline);

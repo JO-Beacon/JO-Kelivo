@@ -176,7 +176,6 @@ void main() {
     });
 
     test('model context override produces a bounded request budget', () {
-      expect(parseContextWindow({'context_window': '8192'}), 8192);
       final budget = compressionRequestCharBudget(
         options: const CompressContextOptions(
           mode: CompressContextLimitMode.unlimited,

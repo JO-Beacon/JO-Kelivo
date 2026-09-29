@@ -10,12 +10,18 @@ final class TextGenerationResult {
   const TextGenerationResult({
     required this.parts,
     this.usage,
+    this.totalUsage,
     this.finishReason,
     this.reasoningDetails,
   });
 
   final List<MessagePart> parts;
+
+  /// 最后一次请求的用量，用于上下文计量与默认底标。
   final TokenUsage? usage;
+
+  /// 本轮所有请求（含工具轮次）的合计用量。
+  final TokenUsage? totalUsage;
   final String? finishReason;
   final dynamic reasoningDetails;
 

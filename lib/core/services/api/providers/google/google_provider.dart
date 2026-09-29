@@ -326,7 +326,7 @@ Map<String, dynamic>? _googleApiPart(Map part) {
 bool _shouldRequestGoogleThoughts(
   ProviderConfig config,
   String modelId,
-  ModelInfo effective,
+  ModelSpec effective,
 ) {
   if (effective.abilities.contains(ModelAbility.reasoning)) return true;
   final kind = ProviderConfig.classify(
@@ -704,6 +704,8 @@ Stream<StreamChunk> sendGoogleStreamEvents(
     yield* runProviderToolRounds(
       retryRound: retryRound,
       sendRound: () async* {
+        // 每轮请求开始前清空上一轮用量，避免 usageOf 取回旧值。
+        totalUsage = null;
         pendingCalls = [];
         lastParts = [];
         lastFunctionCallParts = [];
@@ -723,14 +725,8 @@ Stream<StreamChunk> sendGoogleStreamEvents(
         try {
           final u = (obj['usageMetadata'] as Map?)?.cast<String, dynamic>();
           if (u != null) {
-            final prompt = (u['promptTokenCount'] ?? 0) as int? ?? 0;
-            final completion = (u['candidatesTokenCount'] ?? 0) as int? ?? 0;
             totalUsage = (totalUsage ?? const TokenUsage()).merge(
-              TokenUsage(
-                promptTokens: prompt,
-                completionTokens: completion,
-                cachedTokens: 0,
-              ),
+              googleUsageFromMetadata(u),
             );
           }
         } catch (_) {}
@@ -1143,6 +1139,9 @@ Stream<StreamChunk> sendGoogleStreamEvents(
   yield* runProviderToolRounds(
     retryRound: retryRound,
     sendRound: () async* {
+      // 每轮请求开始前清空上一轮用量，避免 usageOf 取回旧值。
+      usage = null;
+      totalTokens = 0;
       pendingCalls = [];
       lastRoundCalls = [];
       lastRoundModelParts = [];

@@ -596,6 +596,12 @@ class SettingsSearchIndex {
       keywords: 'token usage 令牌 消耗 用量',
     );
     add(
+      'displaySettingsPageShowTotalTokensTitle',
+      SettingsSearchDestination.chatDisplay,
+      (l) => l.displaySettingsPageShowTotalTokensTitle,
+      keywords: 'token usage total API finish 累计 整轮 消耗 用量',
+    );
+    add(
       'displaySettingsPageShowThinkingCardsTitle',
       SettingsSearchDestination.chatDisplay,
       (l) => l.displaySettingsPageShowThinkingCardsTitle,
@@ -609,6 +615,12 @@ class SettingsSearchIndex {
       'displaySettingsPageShowProducedFilesTitle',
       SettingsSearchDestination.chatDisplay,
       (l) => l.displaySettingsPageShowProducedFilesTitle,
+    );
+    add(
+      'displaySettingsPageShowReasoningLevelBadgeTitle',
+      SettingsSearchDestination.chatDisplay,
+      (l) => l.displaySettingsPageShowReasoningLevelBadgeTitle,
+      keywords: 'reasoning level badge 推理档位 徽章',
     );
     add(
       'displaySettingsPageEnableDollarLatexTitle',

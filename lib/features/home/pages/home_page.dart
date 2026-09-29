@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../../desktop/context_usage_popover.dart';
 import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show MissingPluginException;
@@ -27,7 +28,8 @@ import '../../../core/services/android_process_text.dart';
 import '../../../core/services/incoming_share_service.dart';
 import '../../../utils/platform_utils.dart';
 import '../../../desktop/search_provider_popover.dart';
-import '../../../desktop/reasoning_budget_popover.dart';
+import '../../../core/services/model_spec/model_spec_resolver.dart';
+import '../../../desktop/reasoning_level_popover.dart';
 import '../../../desktop/tools_popover.dart';
 import '../../../desktop/workspace_dialog.dart';
 import '../../../desktop/skills_popover.dart';
@@ -39,7 +41,7 @@ import '../../chat/widgets/bottom_tools_sheet.dart';
 import '../../chat/widgets/chat_tools_sheet.dart';
 import '../../chat/utils/ensure_conversation.dart';
 import '../../chat/widgets/context_management_sheet.dart';
-import '../../chat/widgets/reasoning_budget_sheet.dart';
+import '../../chat/widgets/reasoning_level_sheet.dart';
 import '../../search/widgets/search_settings_sheet.dart';
 import '../../model/widgets/model_select_sheet.dart';
 import '../../mcp/pages/mcp_page.dart';
@@ -1694,21 +1696,10 @@ class _HomePageState extends State<HomePage>
       },
       onOpenSearch: _openSearchSettings,
       onConfigureReasoning: () async {
-        final assistantProvider = context.read<AssistantProvider>();
-        final assistant = assistantProvider.currentAssistant;
-        if (assistant == null) return;
-        // 两端都只改当前助手的档位：面板/弹层不再读写全局默认值。
-        int? chosen;
-        await _openReasoningSettings(
-          initialBudget: assistant.thinkingBudget,
-          onChanged: (v) => chosen = v,
-        );
-        if (!mounted) return;
-        if (chosen != null && chosen != assistant.thinkingBudget) {
-          await assistantProvider.updateAssistant(
-            assistant.copyWith(thinkingBudget: chosen),
-          );
-        }
+        await _openReasoningSettings();
+      },
+      onOpenContextUsage: () async {
+        await _openContextUsagePopover();
       },
       onSend: (text) async {
         final result = await _controller.sendMessage(text);
@@ -1987,22 +1978,42 @@ class _HomePageState extends State<HomePage>
         assistant: context.read<AssistantProvider>().currentAssistant,
       );
 
-  Future<void> _openReasoningSettings({
-    required int? initialBudget,
-    required ValueChanged<int> onChanged,
-  }) async {
+  Future<void> _openContextUsagePopover() async {
+    final conversationId = _controller.currentConversation?.id;
+    if (conversationId == null || conversationId.isEmpty) return;
+    await showContextUsagePopover(
+      context,
+      anchorKey: _inputBarKey,
+      conversationId: conversationId,
+      draftText: _inputController.text,
+    );
+  }
+
+  Future<void> _openReasoningSettings() async {
+    final model = _resolvedChatModel();
+    final providerKey = model.providerKey;
+    final modelId = model.modelId;
+    if (providerKey == null || modelId == null) return;
+    final settings = context.read<SettingsProvider>();
+    final config = settings.getProviderConfig(providerKey);
+    if (!ModelSpecResolver.instance.spec(config, modelId).supportsReasoning) {
+      return;
+    }
+    final assistant = context.read<AssistantProvider>().currentAssistant;
     if (PlatformUtils.isDesktop) {
-      await showDesktopReasoningBudgetPopover(
+      await showDesktopReasoningLevelPopover(
         context,
         anchorKey: _inputBarKey,
-        initialBudget: initialBudget,
-        onChanged: onChanged,
+        config: config,
+        modelId: modelId,
+        assistant: assistant,
       );
     } else {
-      await showReasoningBudgetSheet(
+      await showReasoningLevelSheet(
         context,
-        initialBudget: initialBudget,
-        onChanged: onChanged,
+        config: config,
+        modelId: modelId,
+        assistant: assistant,
       );
     }
   }
@@ -2150,6 +2161,8 @@ class _HomePageState extends State<HomePage>
         return SafeArea(
           top: false,
           child: ContextManagementSheet(
+            conversationId: _controller.currentConversation?.id,
+            draftText: _inputController.text,
             clearLabel: _controller.clearContextLabel(),
             messageCountLabel: _controller.contextMessageCountLabel(),
             onCompress: () async {

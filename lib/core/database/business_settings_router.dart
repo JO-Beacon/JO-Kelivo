@@ -543,7 +543,7 @@ final class BusinessSettingsRouter {
             'presetMessages',
             'regexRules',
           },
-          maps: const {'avatarTransform'},
+          maps: const {'avatarTransform', 'reasoning'},
           stringLists: const {
             'mcpServerIds',
             'localToolIds',

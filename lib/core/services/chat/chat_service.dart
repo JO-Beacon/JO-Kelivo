@@ -265,6 +265,35 @@ class ChatService extends ChangeNotifier {
     _conversationListRevision++;
   }
 
+  // 上下文修订号：只表示「进入模型上下文的结构」变了（增删消息、切版本、
+  // 改摘要、换模型/助手、改 MCP 选择…），流式增量不算。
+  final Map<String, int> _contextRevisions = {};
+  final Map<String, ValueNotifier<int>> _contextRevisionNotifiers = {};
+
+  int contextRevision(String conversationId) =>
+      _contextRevisions[conversationId] ?? 0;
+
+  ValueListenable<int> contextRevisionListenable(String conversationId) {
+    return _contextRevisionNotifiers.putIfAbsent(
+      conversationId,
+      () => ValueNotifier<int>(contextRevision(conversationId)),
+    );
+  }
+
+  void _bumpContextRevision(String conversationId) {
+    if (conversationId.isEmpty) return;
+    final next = contextRevision(conversationId) + 1;
+    _contextRevisions[conversationId] = next;
+    final notifier = _contextRevisionNotifiers[conversationId];
+    if (notifier != null) notifier.value = next;
+  }
+
+  void _forgetContextRevision(String conversationId) {
+    _contextRevisions.remove(conversationId);
+    final notifier = _contextRevisionNotifiers.remove(conversationId);
+    notifier?.dispose();
+  }
+
   String? get currentConversationId => _currentConversationId;
 
   bool isTemporaryConversation(String? id) {
@@ -371,6 +400,10 @@ class ChatService extends ChangeNotifier {
       } catch (_) {}
     }
     _initialized = false;
+    for (final id in List<String>.of(_contextRevisionNotifiers.keys)) {
+      _forgetContextRevision(id);
+    }
+    _contextRevisions.clear();
     final lease = _databaseLease;
     _databaseLease = null;
     await lease?.release();
@@ -1942,6 +1975,7 @@ class ChatService extends ChangeNotifier {
     _messagesCache.remove(id);
     _temporaryConversationTrees.remove(id);
     _groupMessagesCache.remove(id);
+    _forgetContextRevision(id);
     if (_currentConversationId == id) {
       _currentConversationId = null;
     }
@@ -1964,6 +1998,7 @@ class ChatService extends ChangeNotifier {
     final removedOrder = _messageOrderIds.remove(id);
     _messageCounts.remove(id);
     _firstGroupIndicesCache.remove(id);
+    _forgetContextRevision(id);
     final artifactMessageIds = <String>{
       if (removedMessages != null)
         for (final message in removedMessages) message.id,
@@ -2651,6 +2686,7 @@ class ChatService extends ChangeNotifier {
       final draft = _draftConversations[conversationId]!;
       draft.mcpServerIds = List.of(serverIds);
       draft.updatedAt = DateTime.now();
+      _bumpContextRevision(conversationId);
       notifyListeners();
       return;
     }
@@ -2659,6 +2695,7 @@ class ChatService extends ChangeNotifier {
     c.mcpServerIds = List.of(serverIds);
     c.updatedAt = DateTime.now();
     await _saveConversation(c);
+    _bumpContextRevision(conversationId);
     _bumpConversationListRevision();
     notifyListeners();
   }
@@ -2710,6 +2747,7 @@ class ChatService extends ChangeNotifier {
       final draft = _draftConversations[id]!;
       draft.summary = summary;
       draft.lastSummarizedMessageCount = messageCount;
+      _bumpContextRevision(id);
       notifyListeners();
       return;
     }
@@ -2720,6 +2758,7 @@ class ChatService extends ChangeNotifier {
     conversation.summary = summary;
     conversation.lastSummarizedMessageCount = messageCount;
     await _saveConversation(conversation);
+    _bumpContextRevision(id);
     notifyListeners();
   }
 
@@ -2746,6 +2785,7 @@ class ChatService extends ChangeNotifier {
       final draft = _draftConversations[conversationId]!;
       draft.summary = null;
       draft.lastSummarizedMessageCount = 0;
+      _bumpContextRevision(conversationId);
       notifyListeners();
       return;
     }
@@ -2756,6 +2796,7 @@ class ChatService extends ChangeNotifier {
     conversation.summary = null;
     conversation.lastSummarizedMessageCount = 0;
     await _saveConversation(conversation);
+    _bumpContextRevision(conversationId);
     notifyListeners();
   }
 
@@ -2769,12 +2810,14 @@ class ChatService extends ChangeNotifier {
       _draftConversations[conversationId] = draft.copyWith(
         extras: update(Map<String, dynamic>.from(draft.extras)),
       );
+      _bumpContextRevision(conversationId);
       notifyListeners();
       return;
     }
     if (!_initialized) return;
     await _repo.updateConversationExtras(conversationId, update);
     await _refreshConversation(conversationId);
+    _bumpContextRevision(conversationId);
     notifyListeners();
   }
 
@@ -3153,6 +3196,8 @@ class ChatService extends ChangeNotifier {
     int? completionTokens,
     int? cachedTokens,
     int? durationMs,
+    int? reasoningTokens,
+    int? cacheWriteTokens,
   }) {
     return _updateMessage(
       messageId,
@@ -3169,6 +3214,8 @@ class ChatService extends ChangeNotifier {
       completionTokens: completionTokens,
       cachedTokens: cachedTokens,
       durationMs: durationMs,
+      reasoningTokens: reasoningTokens,
+      cacheWriteTokens: cacheWriteTokens,
     );
   }
 
@@ -3305,6 +3352,8 @@ class ChatService extends ChangeNotifier {
     int? completionTokens,
     int? cachedTokens,
     int? durationMs,
+    int? reasoningTokens,
+    int? cacheWriteTokens,
   }) {
     return _updateMessage(
       messageId,
@@ -3321,6 +3370,9 @@ class ChatService extends ChangeNotifier {
       completionTokens: completionTokens,
       cachedTokens: cachedTokens,
       durationMs: durationMs,
+      reasoningTokens: reasoningTokens,
+      cacheWriteTokens: cacheWriteTokens,
+      bumpContextRevision: false,
     );
   }
 
@@ -3341,8 +3393,19 @@ class ChatService extends ChangeNotifier {
     int? completionTokens,
     int? cachedTokens,
     int? durationMs,
+    int? reasoningTokens,
+    int? cacheWriteTokens,
+    bool bumpContextRevision = true,
   }) async {
     if (!_initialized) return;
+
+    // 只有真正改写文本/部件/推理内容的更新才算上下文变化；
+    // 单纯追加用量统计不应该让用量估算重算。
+    final shouldBump =
+        bumpContextRevision &&
+        (content != null ||
+            reasoningText != null ||
+            reasoningSegmentsJson != null);
 
     // 临时对话仅存在于内存中。
     final temporaryMessage = _cachedTemporaryMessage(messageId);
@@ -3361,8 +3424,11 @@ class ChatService extends ChangeNotifier {
           completionTokens: completionTokens,
           cachedTokens: cachedTokens,
           durationMs: durationMs,
+          reasoningTokens: reasoningTokens,
+          cacheWriteTokens: cacheWriteTokens,
         ),
       );
+      if (shouldBump) _bumpContextRevision(temporaryMessage.conversationId);
       if (notify) notifyListeners();
       return;
     }
@@ -3385,6 +3451,8 @@ class ChatService extends ChangeNotifier {
       completionTokens: completionTokens,
       cachedTokens: cachedTokens,
       durationMs: durationMs,
+      reasoningTokens: reasoningTokens,
+      cacheWriteTokens: cacheWriteTokens,
     );
     if (updatedMessage == null) return;
 
@@ -3393,6 +3461,7 @@ class ChatService extends ChangeNotifier {
     }
 
     _replaceCachedMessage(updatedMessage);
+    if (shouldBump) _bumpContextRevision(updatedMessage.conversationId);
     if (notify) notifyListeners();
   }
 
@@ -3736,6 +3805,7 @@ class ChatService extends ChangeNotifier {
     if (!_initialized) await init();
     final tree = await _loadOrCreateConversationTree(conversationId);
     final activeIds = tree.activePath();
+    final previousActiveIds = _messageOrderIds[conversationId];
     final messages = _temporaryConversationIds.contains(conversationId)
         ? (_messagesCache[conversationId] ?? const <ChatMessage>[])
         : await _repo.getMessagesByIds(activeIds);
@@ -3762,6 +3832,20 @@ class ChatService extends ChangeNotifier {
     _firstGroupIndicesCache[conversationId] = firstIndices;
     await _cacheMessageArtifacts(activeMessages);
     _touchMessageCache(conversationId);
+    // 活动路径的「消息 ID 序列」才是上下文结构：只有它变了才算上下文变化，
+    // 流式增量与纯读取都不会走到这里。
+    var activeChanged =
+        previousActiveIds == null ||
+        previousActiveIds.length != activeIds.length;
+    if (!activeChanged) {
+      for (var i = 0; i < activeIds.length; i++) {
+        if (previousActiveIds[i] != activeIds[i]) {
+          activeChanged = true;
+          break;
+        }
+      }
+    }
+    if (activeChanged) _bumpContextRevision(conversationId);
   }
 
   Future<ConversationTree?> switchConversationBranch({
@@ -5001,6 +5085,7 @@ class ChatService extends ChangeNotifier {
       draft.chatModelProvider = nextProvider;
       draft.chatModelId = nextModel;
       draft.updatedAt = DateTime.now();
+      _bumpContextRevision(conversationId);
       notifyListeners();
       return draft;
     }
@@ -5014,6 +5099,7 @@ class ChatService extends ChangeNotifier {
     conversation.chatModelId = nextModel;
     conversation.updatedAt = DateTime.now();
     await _saveConversation(conversation);
+    _bumpContextRevision(conversationId);
     notifyListeners();
     return conversation;
   }
@@ -5036,6 +5122,7 @@ class ChatService extends ChangeNotifier {
       if (modelId != null && conversation.chatModelId != modelId) continue;
       conversation.chatModelProvider = null;
       conversation.chatModelId = null;
+      _bumpContextRevision(conversation.id);
       cacheChanged = true;
     }
     if (changed > 0 || cacheChanged) notifyListeners();
@@ -5056,6 +5143,7 @@ class ChatService extends ChangeNotifier {
       draft.truncateIndex = newValue;
       if ((defaultTitle ?? '').isNotEmpty) draft.title = defaultTitle!;
       draft.updatedAt = DateTime.now();
+      _bumpContextRevision(conversationId);
       notifyListeners();
       return draft;
     }
@@ -5071,6 +5159,7 @@ class ChatService extends ChangeNotifier {
     if ((defaultTitle ?? '').isNotEmpty) c.title = defaultTitle!;
     c.updatedAt = DateTime.now();
     await _saveConversation(c);
+    _bumpContextRevision(conversationId);
     _bumpConversationListRevision();
     notifyListeners();
     return c;
@@ -5268,6 +5357,7 @@ class ChatService extends ChangeNotifier {
       }
       draft.assistantId = assistantId;
       draft.updatedAt = DateTime.now();
+      _bumpContextRevision(conversationId);
       if (notify) notifyListeners();
       return _MoveConversationResult.moved;
     }
@@ -5287,6 +5377,7 @@ class ChatService extends ChangeNotifier {
     c.assistantId = assistantId;
     c.updatedAt = updatedAt;
     c.injectedMemoryHash = null;
+    _bumpContextRevision(conversationId);
     if (notify) {
       _bumpConversationListRevision();
       notifyListeners();

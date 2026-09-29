@@ -1,4 +1,7 @@
+import '../../../core/models/model_spec.dart';
+import '../services/context_usage_service.dart';
 import '../../scheduled_tasks/scheduled_task_preparation_binding.dart';
+import '../../../core/models/reasoning_request.dart';
 import '../../../core/services/scheduled_tasks_service.dart';
 import '../../scheduled_tasks/scheduled_task_runner.dart';
 import 'dart:async';
@@ -585,6 +588,13 @@ class HomePageController extends ChangeNotifier {
   }
 
   void _initializeViewModel() {
+    ContextUsageService? contextUsage;
+    try {
+      contextUsage = _context.read<ContextUsageService>();
+    } catch (_) {}
+    contextUsage?.bindAssembler(
+      _messageGenerationService.previewContextAssembly,
+    );
     _viewModel = HomeViewModel(
       chatService: _chatService,
       messageBuilderService: _messageBuilderService,
@@ -594,6 +604,7 @@ class HomePageController extends ChangeNotifier {
       chatController: _chatController,
       contextProvider: _context,
       getTitleForLocale: _titleForLocale,
+      contextUsage: contextUsage,
     );
     _viewModel.onBackgroundTaskError = _showBackgroundTaskFailure;
     _viewModel.addListener(() {
@@ -2982,10 +2993,8 @@ class HomePageController extends ChangeNotifier {
     return _generationController.isToolModel(providerKey, modelId);
   }
 
-  bool isReasoningEnabled(int? budget) {
-    if (budget == null) return true;
-    if (budget == -1) return true;
-    return budget >= 1024;
+  bool isReasoningEnabled(ReasoningRequest request) {
+    return request.level != ReasoningLevel.off;
   }
 
   // ============================================================================

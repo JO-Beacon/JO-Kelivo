@@ -19,6 +19,7 @@ import '../../stream/stream_chunk_emit.dart';
 import '../../stream/stream_chunk_ids.dart';
 import 'openai_tool_transcript.dart';
 import 'openai_vendor_compat.dart';
+import 'openai_request_shaping.dart' show mergeOpenAICompatibleUsage;
 import 'responses_decoder.dart';
 
 List<Map<String, dynamic>> toResponsesToolsFormat(
@@ -254,6 +255,8 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
       ];
     },
     sendFollowUp: () async* {
+      // 每轮请求开始前清空上一轮用量，避免 usageOf 取回旧值。
+      usage = const TokenUsage();
       final body2 = <String, dynamic>{
         'model': upstreamModelId,
         'input': currentInput,

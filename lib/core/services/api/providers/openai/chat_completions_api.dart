@@ -20,6 +20,11 @@ import '../../stream/stream_chunk_ids.dart';
 import 'chat_completions_decoder.dart';
 import 'openai_tool_transcript.dart';
 import 'openai_vendor_compat.dart';
+import '../../../../models/model_spec.dart';
+import '../../../../models/reasoning_request.dart';
+import '../../reasoning/reasoning_dialects.dart' show ReasoningTransport;
+import 'openai_request_shaping.dart'
+    show applyOpenAIResolvedRequest, openaiUsageFromObj;
 import 'reasoning_details_replay.dart';
 
 Map<String, dynamic> copyChatCompletionMessage(Map<String, dynamic> m) {
@@ -247,7 +252,8 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
   List<String>? userMediaPaths,
   required bool canImageInput,
   required bool allowRemoteImages,
-  required ReasoningContentReplayPolicy reasoningContentReplayPolicy,
+  required ReasoningReplayPolicy reasoningReplay,
+  ReasoningReplayField replayField = ReasoningReplayField.reasoningContent,
   bool stripReasoningContent = false,
   bool normalizeReasoningDetails = false,
   bool skipImageParsing = false,
@@ -330,13 +336,21 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
       }
       final keepReasoningContent =
           !stripReasoningContent &&
-          (reasoningContentReplayPolicy == ReasoningContentReplayPolicy.all ||
-              (reasoningContentReplayPolicy ==
-                      ReasoningContentReplayPolicy.toolTurns &&
+          (reasoningReplay == ReasoningReplayPolicy.all ||
+              (reasoningReplay == ReasoningReplayPolicy.toolTurns &&
                   toolTurnIds.contains(messageTurnIds[i])));
       if (!keepReasoningContent) {
         outMsg.remove('reasoning_content');
         outMsg.remove('reasoning');
+      } else if (replayField != ReasoningReplayField.reasoningDetails) {
+        final field = replayField.wireName;
+        final value =
+            outMsg[field] ?? outMsg['reasoning_content'] ?? outMsg['reasoning'];
+        outMsg.remove('reasoning_content');
+        outMsg.remove('reasoning');
+        if (value != null) {
+          outMsg[field] = value;
+        }
       }
       // Only Anthropic upstreams need the streamed fragments rebuilt into
       // whole blocks; other vendors document replaying the sequence verbatim.
@@ -766,6 +780,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
   required String upstreamModelId,
   required Uri url,
   required OpenAIProviderInfo info,
+  required ModelSpec spec,
   required List<Map<String, dynamic>> messages,
   required Map<dynamic, dynamic> firstToolAcc,
   required String firstAssistantContent,
@@ -780,6 +795,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
   required bool isReasoning,
   required String effort,
   required int? thinkingBudget,
+  required ReasoningRequest reasoningRequest,
   required double? temperature,
   required double? topP,
   required List<Map<String, dynamic>>? tools,
@@ -827,6 +843,8 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
       ];
     },
     sendFollowUp: () async* {
+      // 每轮请求开始前清空上一轮用量，避免 usageOf 取回旧值。
+      usage = const TokenUsage();
       final body2 = <String, dynamic>{
         'model': upstreamModelId,
         'messages': await buildOpenAIChatCompletionMessages(
@@ -834,7 +852,8 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
           userMediaPaths: userImagePaths,
           canImageInput: canImageInput,
           allowRemoteImages: allowRemoteImages,
-          reasoningContentReplayPolicy: info.reasoningContentReplayPolicy,
+          reasoningReplay: spec.reasoning.replay,
+          replayField: spec.reasoning.replayField,
           stripReasoningContent: isClaudeUpstream,
           normalizeReasoningDetails: isClaudeUpstream,
           skipImageParsing: skipImageParsing,
@@ -844,18 +863,16 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
         'stream': true,
         if (temperature != null) 'temperature': temperature,
         if (topP != null) 'top_p': topP,
-        if (isReasoning && effort != 'off' && effort != 'auto')
-          'reasoning_effort': effort,
         if (tools != null && tools.isNotEmpty)
           'tools': cleanToolsForCompatibility(tools),
         if (tools != null && tools.isNotEmpty) 'tool_choice': 'auto',
       };
       applyMaxTokens(body2);
-      applyVendorReasoningKnobs(
+      applyOpenAIResolvedRequest(
         body2,
-        info: info,
-        isReasoning: isReasoning,
-        thinkingBudget: thinkingBudget,
+        spec: spec,
+        reasoning: reasoningRequest,
+        transport: ReasoningTransport.chatCompletions,
       );
       maybeAddStreamingUsageOptions(
         body2,
@@ -866,38 +883,12 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
       if (extraBodyCfg.isNotEmpty) {
         body2.addAll(extraBodyCfg);
       }
-      applyPoolsideThinkingIfNeeded(
-        body2,
-        info: info,
-        isReasoning: isReasoning,
-        thinkingBudget: thinkingBudget,
-      );
       // Built-in tools run after the custom body and merge by type.
       applyChatCompletionsBuiltInTools(
         body2,
         config: config,
         modelId: modelId,
         upstreamModelId: upstreamModelId,
-      );
-      sanitizeOpenAIGpt5SamplingParams(
-        body2,
-        upstreamModelId,
-        fallbackEffort: effort,
-        isOpenRouter: info.isOpenRouter,
-      );
-      normalizeMoonshotKimiChatBody(
-        body2,
-        info: info,
-        upstreamModelId: upstreamModelId,
-        isReasoning: isReasoning,
-        thinkingBudget: thinkingBudget,
-      );
-      applyKimiCodeChatThinking(
-        body2,
-        config: config,
-        modelId: modelId,
-        isReasoning: isReasoning,
-        thinkingBudget: thinkingBudget,
       );
       final req2 = http.Request('POST', url);
       req2.headers.addAll(
@@ -979,6 +970,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsNonStreamToolFollowUps({
   required String upstreamModelId,
   required Uri url,
   required OpenAIProviderInfo info,
+  required ModelSpec spec,
   required List<Map<String, dynamic>> messages,
   required Map<String, dynamic> requestBody,
   required Map<String, dynamic> firstObj,
@@ -1022,6 +1014,8 @@ Stream<StreamChunk> runOpenAIChatCompletionsNonStreamToolFollowUps({
       ];
     },
     sendFollowUp: () async* {
+      // 每轮请求开始前清空上一轮用量，避免 usageOf 取回旧值。
+      usage = const TokenUsage();
       final req = http.Request('POST', url);
       req.headers.addAll(
         customHeaders(
@@ -1041,7 +1035,8 @@ Stream<StreamChunk> runOpenAIChatCompletionsNonStreamToolFollowUps({
         userMediaPaths: userImagePaths,
         canImageInput: canImageInput,
         allowRemoteImages: allowRemoteImages,
-        reasoningContentReplayPolicy: info.reasoningContentReplayPolicy,
+        reasoningReplay: spec.reasoning.replay,
+        replayField: spec.reasoning.replayField,
         stripReasoningContent: isClaudeUpstream,
         normalizeReasoningDetails: isClaudeUpstream,
         skipImageParsing: skipImageParsing,

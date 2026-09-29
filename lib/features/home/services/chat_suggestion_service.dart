@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../../../core/models/reasoning_request.dart';
 
 import '../../../core/models/chat_message.dart';
 import '../../../core/providers/settings_provider.dart';
@@ -144,7 +145,7 @@ The suggestions array must contain 0 to 3 distinct, concise strings, each at mos
     required List<ChatMessage> messages,
     required int truncateIndex,
     required String locale,
-    int? thinkingBudget,
+    ReasoningRequest reasoning = ReasoningRequest.auto,
   }) async {
     final content = buildContent(messages, truncateIndex: truncateIndex);
     if (content.isEmpty) return const <String>[];
@@ -161,7 +162,7 @@ The suggestions array must contain 0 to 3 distinct, concise strings, each at mos
         {'role': 'system', 'content': _systemPrompt},
         {'role': 'user', 'content': prompt},
       ],
-      thinkingBudget: thinkingBudget,
+      reasoning: reasoning,
       builtInSearchOnly: true,
       skipImageParsing: true,
       allowImagesApiRouting: false,

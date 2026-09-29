@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
+import '../../../core/services/model_spec/model_spec_resolver.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/model_provider.dart';
 import '../../../core/services/api/builtin_tools.dart';
-import '../../../core/services/model_override_resolver.dart';
 import '../../../core/services/logging/flutter_logger.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
@@ -165,20 +165,15 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
     }
     _idCtrl = TextEditingController(text: displayModelId);
     // 提供 id 时从推断的基础模型取默认值；否则为新模型使用通用默认值
-    final base = ModelRegistry.infer(
-      ModelInfo(
-        id: displayModelId.isEmpty ? 'custom' : displayModelId,
-        displayName: displayModelId.isEmpty ? '' : displayModelId,
-      ),
+    final base = ModelSpecResolver.instance.spec(
+      cfg,
+      displayModelId.isEmpty ? 'custom' : displayModelId,
+      displayName: displayModelId.isEmpty ? '' : displayModelId,
     );
     final ov = initialOv;
     final effective = ov == null
         ? base
-        : ModelOverrideResolver.applyModelOverride(
-            base,
-            ov,
-            applyDisplayName: true,
-          );
+        : ModelSpecOverride.fromJson(ov).applyTo(base, applyDisplayName: true);
     _nameCtrl = TextEditingController(text: effective.displayName);
     _type = effective.type;
     _input

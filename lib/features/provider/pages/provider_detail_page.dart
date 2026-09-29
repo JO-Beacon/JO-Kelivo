@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../../../core/services/model_spec/model_spec_resolver.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -21,7 +22,6 @@ import '../widgets/provider_group_picker_sheet.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../core/services/logging/flutter_logger.dart';
-import '../../../core/services/model_override_resolver.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../shared/widgets/model_tag_wrap.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
@@ -3175,16 +3175,16 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                 .models
                 .toSet();
             final query = controller.text.trim().toLowerCase();
-            final filtered = <ModelInfo>[
+            final filtered = <ModelSpec>[
               for (final m in items)
-                if (m is ModelInfo &&
+                if (m is ModelSpec &&
                     (query.isEmpty ||
                         m.id.toLowerCase().contains(query) ||
                         m.displayName.toLowerCase().contains(query)))
                   m,
             ];
 
-            String groupFor(ModelInfo m) {
+            String groupFor(ModelSpec m) {
               return ModelGrouping.groupFor(
                 m,
                 embeddingsLabel: l10n.providerDetailPageEmbeddingsGroupTitle,
@@ -3192,7 +3192,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
               );
             }
 
-            final Map<String, List<ModelInfo>> grouped = {};
+            final Map<String, List<ModelSpec>> grouped = {};
             for (final m in filtered) {
               final g = groupFor(m);
               (grouped[g] ??= []).add(m);
@@ -3335,9 +3335,9 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                                         final q = controller.text
                                             .trim()
                                             .toLowerCase();
-                                        final filteredNow = <ModelInfo>[
+                                        final filteredNow = <ModelSpec>[
                                           for (final m in items)
-                                            if (m is ModelInfo &&
+                                            if (m is ModelSpec &&
                                                 (q.isEmpty ||
                                                     m.id.toLowerCase().contains(
                                                       q,
@@ -3916,16 +3916,16 @@ class _ModelCard extends StatelessWidget {
     );
   }
 
-  ModelInfo _infer(String id) {
-    // 构建最小 ModelInfo，让注册表推断其余信息
-    return ModelRegistry.infer(ModelInfo(id: id, displayName: id));
+  ModelSpec _infer(BuildContext context, String id) {
+    final cfg = context.read<SettingsProvider>().getProviderConfig(providerKey);
+    return ModelSpecResolver.instance.spec(cfg, id, displayName: id);
   }
 
   _ResolvedModelOverride _resolveBaseAndOverride(BuildContext context) {
     final configs = context.watch<SettingsProvider>().providerConfigs;
     final cfg = configs[providerKey];
     if (cfg == null) {
-      final base = _infer(modelId);
+      final base = _infer(context, modelId);
       return _ResolvedModelOverride(base: base, ov: null, baseId: modelId);
     }
     final rawOv = cfg.modelOverrides[modelId];
@@ -3937,7 +3937,7 @@ class _ModelCard extends StatelessWidget {
       final raw = (ov['apiModelId'] ?? ov['api_model_id'])?.toString().trim();
       if (raw != null && raw.isNotEmpty) baseId = raw;
     }
-    final base = _infer(baseId);
+    final base = _infer(context, baseId);
     return _ResolvedModelOverride(base: base, ov: ov, baseId: baseId);
   }
 }
@@ -3949,7 +3949,7 @@ class _ResolvedModelOverride {
     required this.baseId,
   });
 
-  final ModelInfo base;
+  final ModelSpec base;
   final Map<String, dynamic>? ov;
   final String baseId;
 }
@@ -4272,17 +4272,15 @@ Future<String?> showModelPickerForTest(
   return sel?.modelId;
 }
 
-ModelInfo _applyModelOverride(
-  ModelInfo base,
+ModelSpec _applyModelOverride(
+  ModelSpec base,
   Map<String, dynamic> ov, {
   bool applyDisplayName = false,
 }) {
   try {
-    return ModelOverrideResolver.applyModelOverride(
-      base,
+    return ModelSpecOverride.fromJson(
       ov,
-      applyDisplayName: applyDisplayName,
-    );
+    ).applyTo(base, applyDisplayName: applyDisplayName);
   } catch (e, st) {
     FlutterLogger.log(
       '[ModelOverride] applyModelOverride failed: $e\n$st',

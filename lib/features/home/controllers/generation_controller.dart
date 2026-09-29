@@ -1,4 +1,6 @@
 import 'package:flutter/widgets.dart';
+import '../../../core/models/reasoning_request.dart';
+import '../../../core/services/model_spec/model_spec_resolver.dart';
 import 'package:provider/provider.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/models/chat_message.dart';
@@ -85,10 +87,10 @@ class GenerationController {
           const [];
       return abilities.contains('reasoning');
     }
-    final inferred = ModelRegistry.infer(
-      ModelInfo(id: modelId, displayName: modelId),
-    );
-    return inferred.abilities.contains(ModelAbility.reasoning);
+    return ModelSpecResolver.instance
+        .spec(cfg, modelId)
+        .abilities
+        .contains(ModelAbility.reasoning);
   }
 
   bool isToolModel(String providerKey, String modelId) {
@@ -104,16 +106,14 @@ class GenerationController {
           const [];
       return abilities.contains('tool');
     }
-    final inferred = ModelRegistry.infer(
-      ModelInfo(id: modelId, displayName: modelId),
-    );
-    return inferred.abilities.contains(ModelAbility.tool);
+    return ModelSpecResolver.instance
+        .spec(cfg, modelId)
+        .abilities
+        .contains(ModelAbility.tool);
   }
 
-  bool isReasoningEnabled(int? budget) {
-    if (budget == null) return true; // 将 null 视为默认/自动 -> 启用
-    if (budget == -1) return true; // 自动
-    return budget >= 1024;
+  bool isReasoningEnabled(ReasoningRequest request) {
+    return request.level != ReasoningLevel.off;
   }
 
   // ============================================================================

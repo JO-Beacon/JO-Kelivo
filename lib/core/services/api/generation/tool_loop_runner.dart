@@ -10,6 +10,29 @@ import '../stream/stream_chunk_emit.dart';
 typedef StreamRoundRunner =
     Stream<StreamChunk> Function(Stream<StreamChunk> Function() sendRound);
 
+/// 给每个 HTTP 轮次的首个用量打上标记（含非流式响应：用量解完才有）。
+/// 标记放在重试器外面，用量记录就不会影响空失败请求的重试。
+/// 调用方每轮重置 [usageOf]，避免它拿回上一轮的用量。
+Stream<StreamChunk> _withRequestUsage(
+  Stream<StreamChunk> source,
+  TokenUsage? Function()? usageOf,
+) async* {
+  var startsRequest = true;
+  await for (final chunk in source) {
+    if (chunk is Usage) {
+      yield Usage(chunk.usage, startsRequest: startsRequest);
+      startsRequest = false;
+    } else {
+      yield chunk;
+    }
+  }
+  final usage = usageOf?.call();
+  if (usage != null || startsRequest) {
+    // 缺失用量不得把上一轮重复计入。
+    yield Usage(usage ?? const TokenUsage(), startsRequest: startsRequest);
+  }
+}
+
 final class ExecutedClientTool {
   const ExecutedClientTool({
     required this.call,
@@ -96,7 +119,10 @@ Stream<StreamChunk> runClientToolFollowUps({
       totalTokens: totalTokens,
     );
     await append(executed);
-    yield* retryRound?.call(sendFollowUp) ?? sendFollowUp();
+    yield* _withRequestUsage(
+      retryRound?.call(sendFollowUp) ?? sendFollowUp(),
+      usageOf,
+    );
     calls = takeCallsAfterRound();
   }
   yield* finish();
@@ -124,7 +150,10 @@ Stream<StreamChunk> runProviderToolRounds({
     if (roundIndex == 0) {
       yield* sendRound();
     } else {
-      yield* retryRound?.call(sendRound) ?? sendRound();
+      yield* _withRequestUsage(
+        retryRound?.call(sendRound) ?? sendRound(),
+        usageOf,
+      );
     }
     roundIndex++;
     final calls = takeCalls();

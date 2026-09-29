@@ -11,6 +11,9 @@ import '../logging/context_log_models.dart';
 import '../logging/flutter_logger.dart';
 import 'provider_request_headers.dart';
 import '../../models/auto_retry_options.dart';
+import '../../models/reasoning_request.dart';
+import '../model_spec/model_spec_resolver.dart';
+import 'reasoning/reasoning_dialects.dart' show resolveBudget;
 import 'retry_policy.dart';
 import 'generation/tool_loop_runner.dart' show StreamRoundRunner;
 import 'generation/text_generation_result.dart';
@@ -36,6 +39,8 @@ import 'stream/stream_chunk_emit.dart';
 export 'generation/tool_loop_runner.dart';
 export 'stream/stream_chunk_emit.dart';
 
+/// 把旧的整数思考预算折算成显式推理档位。
+///
 typedef ToolCallHandler =
     Future<dynamic> Function(
       String name,
@@ -194,7 +199,7 @@ class ChatApiService {
     required String modelId,
     required List<Map<String, dynamic>> messages,
     List<String>? userImagePaths,
-    int? thinkingBudget,
+    ReasoningRequest? reasoning,
     double? temperature,
     double? topP,
     int? maxTokens,
@@ -213,6 +218,20 @@ class ChatApiService {
     // 分离文本生成禁止媒体、工具和自定义请求体。
     bool textOnly = false,
   }) async* {
+    final resolvedReasoning = reasoning ?? ReasoningRequest.auto;
+    // 供应商内部仍以整数预算表达思考强度；这里统一折算，
+    // 避免每个供应商各算一遍。
+    final int effectiveThinkingBudget = switch (resolvedReasoning.level) {
+      ReasoningLevel.auto => -1,
+      ReasoningLevel.off => 0,
+      _ =>
+        resolvedReasoning.budgetTokens ??
+            resolveBudget(
+              ModelSpecResolver.instance.spec(config, modelId),
+              resolvedReasoning.level,
+            ) ??
+            -1,
+    };
     final sessionToken = CancelToken();
     final toolCancellation = ToolCallCancellation(
       isCancelled: () => sessionToken.isCancelled,
@@ -312,7 +331,8 @@ class ChatApiService {
           modelId: modelId,
           messages: messages,
           userImagePaths: userImagePaths,
-          thinkingBudget: thinkingBudget,
+          thinkingBudget: effectiveThinkingBudget,
+          reasoning: resolvedReasoning,
           temperature: temperature,
           topP: topP,
           maxTokens: maxTokens,
@@ -350,6 +370,7 @@ class ChatApiService {
     required List<Map<String, dynamic>> messages,
     List<String>? userImagePaths,
     int? thinkingBudget,
+    ReasoningRequest? reasoning,
     double? temperature,
     double? topP,
     int? maxTokens,
@@ -443,6 +464,7 @@ class ChatApiService {
           safeMessages,
           userImagePaths: safeUserImagePaths,
           thinkingBudget: thinkingBudget,
+          reasoning: reasoning ?? ReasoningRequest.auto,
           temperature: temperature,
           topP: topP,
           maxTokens: maxTokens,
@@ -496,6 +518,7 @@ class ChatApiService {
             safeMessages,
             userImagePaths: safeUserImagePaths,
             thinkingBudget: thinkingBudget,
+            reasoning: reasoning ?? ReasoningRequest.auto,
             temperature: temperature,
             topP: topP,
             maxTokens: maxTokens,
@@ -562,7 +585,7 @@ class ChatApiService {
     required String modelId,
     required List<Map<String, dynamic>> messages,
     List<String>? userImagePaths,
-    int? thinkingBudget,
+    ReasoningRequest? reasoning,
     double? temperature,
     double? topP,
     int? maxTokens,
@@ -580,6 +603,7 @@ class ChatApiService {
     bool textOnly = false,
     AutoRetryOptions? retryOverride,
     void Function(RetryPending? pending)? onRetry,
+    void Function(Usage update)? onUsage,
   }) async {
     final handler = StreamChunkHandler(
       onRetry: onRetry == null ? null : (pending) => onRetry(pending),
@@ -589,7 +613,7 @@ class ChatApiService {
       modelId: modelId,
       messages: messages,
       userImagePaths: userImagePaths,
-      thinkingBudget: thinkingBudget,
+      reasoning: reasoning,
       temperature: temperature,
       topP: topP,
       maxTokens: maxTokens,
@@ -612,6 +636,7 @@ class ChatApiService {
         onRetry?.call(null);
       }
       handler.handle(chunk);
+      if (chunk is Usage) onUsage?.call(chunk);
     }
     return handler.toResult();
   }
@@ -625,7 +650,7 @@ class ChatApiService {
     String? conversationId,
     Map<String, String>? extraHeaders,
     Map<String, dynamic>? extraBody,
-    int? thinkingBudget,
+    ReasoningRequest? reasoning,
 
     /// 工具提示（标题、摘要、压缩）只处理文本；保留 Markdown 图片语法，不执行媒体发现。
     bool skipImageParsing = false,
@@ -639,7 +664,7 @@ class ChatApiService {
       ],
       extraHeaders: extraHeaders,
       extraBody: extraBody,
-      thinkingBudget: thinkingBudget,
+      reasoning: reasoning,
       // 工具类调用只需要搜索：绝不需要图片生成或代码解释器。
       builtInSearchOnly: true,
       skipImageParsing: skipImageParsing,

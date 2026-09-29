@@ -4954,95 +4954,11 @@ abstract class AppLocalizations {
   /// **'Delete All Branches'**
   String get messageMoreSheetDeleteAllVersions;
 
-  /// No description provided for @reasoningBudgetSheetOff.
-  ///
-  /// In en, this message translates to:
-  /// **'Off'**
-  String get reasoningBudgetSheetOff;
-
-  /// No description provided for @reasoningBudgetSheetAuto.
-  ///
-  /// In en, this message translates to:
-  /// **'Auto'**
-  String get reasoningBudgetSheetAuto;
-
-  /// No description provided for @reasoningBudgetSheetLight.
-  ///
-  /// In en, this message translates to:
-  /// **'Light Reasoning'**
-  String get reasoningBudgetSheetLight;
-
-  /// No description provided for @reasoningBudgetSheetMedium.
-  ///
-  /// In en, this message translates to:
-  /// **'Medium Reasoning'**
-  String get reasoningBudgetSheetMedium;
-
-  /// No description provided for @reasoningBudgetSheetHeavy.
-  ///
-  /// In en, this message translates to:
-  /// **'Heavy Reasoning'**
-  String get reasoningBudgetSheetHeavy;
-
-  /// No description provided for @reasoningBudgetSheetXhigh.
-  ///
-  /// In en, this message translates to:
-  /// **'Extreme Reasoning'**
-  String get reasoningBudgetSheetXhigh;
-
-  /// No description provided for @reasoningBudgetSheetMax.
-  ///
-  /// In en, this message translates to:
-  /// **'Maximum Reasoning'**
-  String get reasoningBudgetSheetMax;
-
   /// No description provided for @reasoningBudgetSheetTitle.
   ///
   /// In en, this message translates to:
   /// **'Reasoning Chain Strength'**
   String get reasoningBudgetSheetTitle;
-
-  /// No description provided for @reasoningBudgetSheetCurrentLevel.
-  ///
-  /// In en, this message translates to:
-  /// **'Current Level: {level}'**
-  String reasoningBudgetSheetCurrentLevel(String level);
-
-  /// No description provided for @reasoningBudgetSheetOffSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Turn off reasoning, answer directly'**
-  String get reasoningBudgetSheetOffSubtitle;
-
-  /// No description provided for @reasoningBudgetSheetAutoSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Let the model decide reasoning level automatically'**
-  String get reasoningBudgetSheetAutoSubtitle;
-
-  /// No description provided for @reasoningBudgetSheetLightSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Use light reasoning to answer questions'**
-  String get reasoningBudgetSheetLightSubtitle;
-
-  /// No description provided for @reasoningBudgetSheetMediumSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Use moderate reasoning to answer questions'**
-  String get reasoningBudgetSheetMediumSubtitle;
-
-  /// No description provided for @reasoningBudgetSheetHeavySubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Use heavy reasoning for complex questions'**
-  String get reasoningBudgetSheetHeavySubtitle;
-
-  /// No description provided for @reasoningBudgetSheetXhighSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Use maximum reasoning depth for the toughest problems'**
-  String get reasoningBudgetSheetXhighSubtitle;
 
   /// No description provided for @reasoningBudgetSheetCustomLabel.
   ///
@@ -16801,36 +16717,6 @@ abstract class AppLocalizations {
   /// **'Location permission is blocked. Allow location access in system settings, then turn this tool on again.'**
   String get assistantEditLocationPermissionSettingsMessage;
 
-  /// No description provided for @reasoningBudgetSliderLow.
-  ///
-  /// In en, this message translates to:
-  /// **'Low'**
-  String get reasoningBudgetSliderLow;
-
-  /// No description provided for @reasoningBudgetSliderMedium.
-  ///
-  /// In en, this message translates to:
-  /// **'Medium'**
-  String get reasoningBudgetSliderMedium;
-
-  /// No description provided for @reasoningBudgetSliderHigh.
-  ///
-  /// In en, this message translates to:
-  /// **'High'**
-  String get reasoningBudgetSliderHigh;
-
-  /// No description provided for @reasoningBudgetSliderXhigh.
-  ///
-  /// In en, this message translates to:
-  /// **'XHigh'**
-  String get reasoningBudgetSliderXhigh;
-
-  /// No description provided for @reasoningBudgetSliderMax.
-  ///
-  /// In en, this message translates to:
-  /// **'Max'**
-  String get reasoningBudgetSliderMax;
-
   /// No description provided for @autoRetryCountdown.
   ///
   /// In en, this message translates to:
@@ -21692,6 +21578,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Show files created or modified by tools below replies.'**
   String get displaySettingsPageShowProducedFilesSubtitle;
+
+  /// No description provided for @displaySettingsPageShowReasoningLevelBadgeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Show Reasoning Level on the Button'**
+  String get displaySettingsPageShowReasoningLevelBadgeTitle;
+
+  /// No description provided for @displaySettingsPageShowReasoningLevelBadgeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Show the current level next to the reasoning icon in the input bar.'**
+  String get displaySettingsPageShowReasoningLevelBadgeSubtitle;
 
   /// No description provided for @googleFontsTitle.
   ///

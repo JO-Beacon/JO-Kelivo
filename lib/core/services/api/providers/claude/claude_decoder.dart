@@ -669,21 +669,24 @@ class ClaudeClientTool {
 }
 
 TokenUsage claudeUsageFromMap(Map<String, dynamic> usage) {
-  final inTok = _readClaudeUsageInt(usage['input_tokens']);
+  final cacheRead = _readClaudeUsageInt(usage['cache_read_input_tokens']);
+  final cacheWrite = _readClaudeUsageInt(usage['cache_creation_input_tokens']);
+  final uncached = _readClaudeUsageInt(usage['input_tokens']);
+  // Claude 把缓存读写与未缓存输入分开报；进入「提示词总量」的应是三者之和。
+  final inTok = uncached == null && cacheRead == null && cacheWrite == null
+      ? null
+      : (uncached ?? 0) + (cacheRead ?? 0) + (cacheWrite ?? 0);
   final outTok = _readClaudeUsageInt(usage['output_tokens']);
-  final cached =
-      _readClaudeUsageInt(usage['cache_read_input_tokens']) +
-      _readClaudeUsageInt(usage['cache_creation_input_tokens']);
   return TokenUsage(
     promptTokens: inTok,
     completionTokens: outTok,
-    cachedTokens: cached,
-    totalTokens: inTok + outTok,
+    cachedTokens: cacheRead,
+    cacheWriteTokens: cacheWrite,
   );
 }
 
-int _readClaudeUsageInt(dynamic value) {
+int? _readClaudeUsageInt(dynamic value) {
   if (value is num) return value.toInt();
-  if (value is String) return int.tryParse(value) ?? 0;
-  return 0;
+  if (value is String) return int.tryParse(value);
+  return null;
 }

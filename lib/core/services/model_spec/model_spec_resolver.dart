@@ -112,6 +112,26 @@ class ModelSpecResolver {
   ModelSpec spec(ProviderConfig cfg, String modelKey, {String? displayName}) =>
       resolve(cfg, modelKey, displayName: displayName).spec;
 
+  /// 仅按模型 id 推断规格，不带供应商配置与覆盖。
+  ///
+  /// 供无法拿到 [ProviderConfig] 的展示路径使用（例如模型选择器的后台组装）。
+  ModelSpec specFromId(String modelId, {String? displayName}) {
+    final base = ModelSpec(id: modelId, displayName: displayName ?? modelId);
+    final guess = ModelDefaultsGuesser.guess(modelId, base: base);
+    return base.copyWith(
+      type: guess.type,
+      input: guess.input,
+      output: guess.output,
+      abilities: guess.abilities,
+      reasoning: guess.reasoning ?? base.reasoning,
+      sampling: guess.sampling ?? base.sampling,
+      maxOutput: guess.maxOutput ?? base.maxOutput,
+      dynamicWebSearch: guess.dynamicWebSearch,
+      remoteImageUrls: guess.remoteImageUrls,
+      promptCacheControl: guess.promptCacheControl,
+    );
+  }
+
   ResolvedModelSpec resolve(
     ProviderConfig cfg,
     String modelKey, {

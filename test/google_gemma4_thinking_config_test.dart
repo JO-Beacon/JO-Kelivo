@@ -2,7 +2,9 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'support/legacy_reasoning.dart';
 
+import 'package:Kelivo/core/models/reasoning_request.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
 
@@ -85,7 +87,7 @@ Map<String, dynamic>? _thinkingConfig(Map<String, dynamic> body) {
 
 Future<Map<String, dynamic>> _captureThinkingConfig({
   required String modelId,
-  int? thinkingBudget,
+  ReasoningRequest? reasoning,
 }) async {
   late Map<String, dynamic> body;
   final server = await _startGeminiServer((captured) => body = captured);
@@ -99,7 +101,7 @@ Future<Map<String, dynamic>> _captureThinkingConfig({
     messages: const [
       {'role': 'user', 'content': 'hello'},
     ],
-    thinkingBudget: thinkingBudget,
+    reasoning: reasoning,
     stream: false,
   ).toList();
 
@@ -126,7 +128,7 @@ void main() {
         messages: const [
           {'role': 'user', 'content': 'hello'},
         ],
-        thinkingBudget: 16000,
+        reasoning: legacyBudget(16000),
         stream: false,
       ).toList();
 
@@ -158,7 +160,7 @@ void main() {
         messages: const [
           {'role': 'user', 'content': 'hello'},
         ],
-        thinkingBudget: 1024,
+        reasoning: legacyBudget(1024),
       ).toList();
 
       expect(chunks.isGenerationDone, isTrue);
@@ -189,7 +191,7 @@ void main() {
         messages: const [
           {'role': 'user', 'content': 'hello'},
         ],
-        thinkingBudget: 0,
+        reasoning: legacyBudget(0),
       ).toList();
 
       expect(chunks.isGenerationDone, isTrue);
@@ -204,7 +206,7 @@ void main() {
     test('routes an unknown Gemini 3.x Pro through thinkingLevel', () async {
       final body = await _captureThinkingConfig(
         modelId: 'gemini-3.2-pro-preview',
-        thinkingBudget: 16000,
+        reasoning: legacyBudget(16000),
       );
 
       expect(_thinkingConfig(body), {
@@ -216,7 +218,7 @@ void main() {
     test('hides thoughts when Gemini 3.7 thinking is off', () async {
       final body = await _captureThinkingConfig(
         modelId: 'gemini-3.7-flash',
-        thinkingBudget: 0,
+        reasoning: legacyBudget(0),
       );
 
       expect(_thinkingConfig(body), {
@@ -237,7 +239,7 @@ void main() {
 
         final offBody = await _captureThinkingConfig(
           modelId: 'gemini-3.8-flash',
-          thinkingBudget: 0,
+          reasoning: legacyBudget(0),
         );
         expect(_thinkingConfig(offBody), {
           'includeThoughts': false,

@@ -1560,6 +1560,17 @@ class ChatItemDisplaySettingsPage extends StatelessWidget {
               _iosDivider(context),
               _iosSwitchRow(
                 context,
+                icon: Lucide.Calculator,
+                label: l10n.displaySettingsPageShowTotalTokensTitle,
+                // 本仓库该行的说明直接显出来，不放在 tip 里。
+                subtitle: l10n.displaySettingsPageShowTotalTokensSubtitle,
+                value: sp.showTotalTokens,
+                onChanged: (v) =>
+                    context.read<SettingsProvider>().setShowTotalTokens(v),
+              ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
                 icon: Lucide.Sparkles,
                 label: l10n.displaySettingsPageShowThinkingCardsTitle,
                 subtitle: l10n.displaySettingsPageShowThinkingCardsSubtitle,
@@ -1588,6 +1599,18 @@ class ChatItemDisplaySettingsPage extends StatelessWidget {
                 value: sp.showProducedFiles,
                 onChanged: (v) =>
                     context.read<SettingsProvider>().setShowProducedFiles(v),
+              ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
+                icon: Lucide.Lightbulb,
+                label: l10n.displaySettingsPageShowReasoningLevelBadgeTitle,
+                subtitle:
+                    l10n.displaySettingsPageShowReasoningLevelBadgeSubtitle,
+                value: sp.showReasoningLevelBadge,
+                onChanged: (v) => context
+                    .read<SettingsProvider>()
+                    .setShowReasoningLevelBadge(v),
               ),
             ],
           ),

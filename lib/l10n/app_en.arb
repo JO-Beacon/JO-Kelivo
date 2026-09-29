@@ -1108,28 +1108,7 @@
   "messageMoreSheetDeleteMessageNode": "Delete This Branch Node",
   "messageMoreSheetDelete": "Delete Current Branch",
   "messageMoreSheetDeleteAllVersions": "Delete All Branches",
-  "reasoningBudgetSheetOff": "Off",
-  "reasoningBudgetSheetAuto": "Auto",
-  "reasoningBudgetSheetLight": "Light Reasoning",
-  "reasoningBudgetSheetMedium": "Medium Reasoning",
-  "reasoningBudgetSheetHeavy": "Heavy Reasoning",
-  "reasoningBudgetSheetXhigh": "Extreme Reasoning",
-  "reasoningBudgetSheetMax": "Maximum Reasoning",
   "reasoningBudgetSheetTitle": "Reasoning Chain Strength",
-  "reasoningBudgetSheetCurrentLevel": "Current Level: {level}",
-  "@reasoningBudgetSheetCurrentLevel": {
-    "placeholders": {
-      "level": {
-        "type": "String"
-      }
-    }
-  },
-  "reasoningBudgetSheetOffSubtitle": "Turn off reasoning, answer directly",
-  "reasoningBudgetSheetAutoSubtitle": "Let the model decide reasoning level automatically",
-  "reasoningBudgetSheetLightSubtitle": "Use light reasoning to answer questions",
-  "reasoningBudgetSheetMediumSubtitle": "Use moderate reasoning to answer questions",
-  "reasoningBudgetSheetHeavySubtitle": "Use heavy reasoning for complex questions",
-  "reasoningBudgetSheetXhighSubtitle": "Use maximum reasoning depth for the toughest problems",
   "reasoningBudgetSheetCustomLabel": "Custom Reasoning Budget",
   "reasoningBudgetSheetCustomHint": "e.g. 2048 (-1 auto, 0 off)",
   "chatMessageWidgetFileNotFound": "File not found: {fileName}",
@@ -4087,11 +4066,6 @@
   "healthDataSettingsTypeMenstrualFlowTitle": "Menstrual flow",
   "healthDataSettingsTypeMenstrualFlowSubtitle": "Recorded menstrual flow and cycle starts in the past 90 days",
   "assistantEditLocationPermissionSettingsMessage": "Location permission is blocked. Allow location access in system settings, then turn this tool on again.",
-  "reasoningBudgetSliderLow": "Low",
-  "reasoningBudgetSliderMedium": "Medium",
-  "reasoningBudgetSliderHigh": "High",
-  "reasoningBudgetSliderXhigh": "XHigh",
-  "reasoningBudgetSliderMax": "Max",
   "autoRetryCountdown": "{seconds}s until retry ({attempt}/{maxRetries})",
   "@autoRetryCountdown": {
     "placeholders": {
@@ -5542,6 +5516,8 @@
   "workspaceToolFilesTruncated": "Only some files are listed.",
   "displaySettingsPageShowProducedFilesTitle": "Show Files Below Replies",
   "displaySettingsPageShowProducedFilesSubtitle": "Show files created or modified by tools below replies.",
+  "displaySettingsPageShowReasoningLevelBadgeTitle": "Show Reasoning Level on the Button",
+  "displaySettingsPageShowReasoningLevelBadgeSubtitle": "Show the current level next to the reasoning icon in the input bar.",
   "googleFontsTitle": "Google Fonts",
   "googleFontsRefresh": "Refresh font list",
   "googleFontsSearchHint": "Search fonts or languages",

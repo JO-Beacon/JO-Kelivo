@@ -5,9 +5,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 
 import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/core/models/model_spec.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
 import 'package:Kelivo/core/services/api/providers/openai/chat_completions_api.dart';
-import 'package:Kelivo/core/services/api/providers/openai/openai_vendor_compat.dart';
 import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
 import 'package:Kelivo/core/services/workspace/workspace_tools_service.dart';
 import 'package:Kelivo/utils/mcp_structured_image.dart';
@@ -587,7 +587,7 @@ void main() {
         ],
         canImageInput: true,
         allowRemoteImages: false,
-        reasoningContentReplayPolicy: ReasoningContentReplayPolicy.none,
+        reasoningReplay: ReasoningReplayPolicy.none,
       );
       expect(messages.map((m) => m['role']), ['tool', 'tool', 'user']);
       expect(messages[2]['content'][0]['text'], contains('(image)'));

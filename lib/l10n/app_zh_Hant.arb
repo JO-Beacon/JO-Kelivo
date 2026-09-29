@@ -785,21 +785,7 @@
   "messageMoreSheetDeleteMessageNode": "刪除此分支節點",
   "messageMoreSheetDelete": "刪除目前分支",
   "messageMoreSheetDeleteAllVersions": "刪除所有分支",
-  "reasoningBudgetSheetOff": "關閉",
-  "reasoningBudgetSheetAuto": "自動",
-  "reasoningBudgetSheetLight": "輕度推理",
-  "reasoningBudgetSheetMedium": "中度推理",
-  "reasoningBudgetSheetHeavy": "重度推理",
-  "reasoningBudgetSheetXhigh": "極限推理",
-  "reasoningBudgetSheetMax": "全力推理",
   "reasoningBudgetSheetTitle": "思維鏈強度",
-  "reasoningBudgetSheetCurrentLevel": "目前檔位：{level}",
-  "reasoningBudgetSheetOffSubtitle": "關閉推理功能，直接回答",
-  "reasoningBudgetSheetAutoSubtitle": "由模型自動決定推理級別",
-  "reasoningBudgetSheetLightSubtitle": "使用少量推理來回答問題",
-  "reasoningBudgetSheetMediumSubtitle": "使用較多推理來回答問題",
-  "reasoningBudgetSheetHeavySubtitle": "使用大量推理來回答問題，適合複雜問題",
-  "reasoningBudgetSheetXhighSubtitle": "使用最大推理深度，適合最複雜的問題",
   "reasoningBudgetSheetCustomLabel": "自訂推理預算",
   "reasoningBudgetSheetCustomHint": "例如：2048 (-1 自動，0 關閉)",
   "chatMessageWidgetFileNotFound": "檔案不存在: {fileName}",
@@ -2781,11 +2767,6 @@
   "healthDataSettingsTypeMenstrualFlowTitle": "經期記錄",
   "healthDataSettingsTypeMenstrualFlowSubtitle": "最近 90 天記錄的經量與週期開始日期",
   "assistantEditLocationPermissionSettingsMessage": "定位權限已被禁止。請在系統設定中允許定位存取，然後重新開啟此工具。",
-  "reasoningBudgetSliderLow": "Low",
-  "reasoningBudgetSliderMedium": "Medium",
-  "reasoningBudgetSliderHigh": "High",
-  "reasoningBudgetSliderXhigh": "XHigh",
-  "reasoningBudgetSliderMax": "Max",
   "autoRetryCountdown": "{seconds} 秒後重試 ({attempt}/{maxRetries})",
   "settingsPageAutoRetry": "自動重試",
   "settingsPageFirstTurnPlaceholder": "首則訊息佔位",
@@ -3595,6 +3576,8 @@
   "workspaceToolFilesTruncated": "僅列出部分檔案。",
   "displaySettingsPageShowProducedFilesTitle": "顯示回覆底部檔案卡片",
   "displaySettingsPageShowProducedFilesSubtitle": "在回覆底部顯示工具建立或修改的檔案。",
+  "displaySettingsPageShowReasoningLevelBadgeTitle": "在按鈕上顯示推理檔位",
+  "displaySettingsPageShowReasoningLevelBadgeSubtitle": "在輸入欄的推理圖示旁顯示目前檔位。",
   "googleFontsTitle": "Google Fonts",
   "googleFontsRefresh": "重新整理字型列表",
   "googleFontsSearchHint": "搜尋字型或語言",
@@ -4209,13 +4192,6 @@
       },
       "totalTokens": {
         "type": "int"
-      }
-    }
-  },
-  "@reasoningBudgetSheetCurrentLevel": {
-    "placeholders": {
-      "level": {
-        "type": "String"
       }
     }
   },

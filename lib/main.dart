@@ -95,6 +95,7 @@ import 'core/services/mcp/mcp_tool_service.dart';
 import 'core/services/logging/flutter_logger.dart';
 import 'core/services/logging/startup_recorder.dart';
 import 'features/home/services/ask_user_interaction_service.dart';
+import 'features/home/services/context_usage_service.dart';
 import 'features/home/services/tool_approval_service.dart';
 import 'utils/app_directories.dart';
 import 'utils/platform_utils.dart';
@@ -908,6 +909,16 @@ class MyApp extends StatelessWidget {
           create: (_) => MemoryProviderV2(
             repository: MemoryRepository(businessPreferences),
             chatRepository: databaseLease.chatRepository,
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (ctx) => ContextUsageService(
+            chatService: ctx.read<ChatService>(),
+            settings: ctx.read<SettingsProvider>(),
+            assistants: ctx.read<AssistantProvider>(),
+            instructions: ctx.read<InstructionInjectionProvider>(),
+            worldBooks: ctx.read<WorldBookProvider>(),
+            memories: ctx.read<MemoryProviderV2>(),
           ),
         ),
         Provider<ExtensionEntityStore>.value(

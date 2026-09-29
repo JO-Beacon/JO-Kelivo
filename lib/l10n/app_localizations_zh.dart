@@ -2563,51 +2563,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get messageMoreSheetDeleteAllVersions => '删除所有分支';
 
   @override
-  String get reasoningBudgetSheetOff => '关闭';
-
-  @override
-  String get reasoningBudgetSheetAuto => '自动';
-
-  @override
-  String get reasoningBudgetSheetLight => '轻度推理';
-
-  @override
-  String get reasoningBudgetSheetMedium => '中度推理';
-
-  @override
-  String get reasoningBudgetSheetHeavy => '重度推理';
-
-  @override
-  String get reasoningBudgetSheetXhigh => '极限推理';
-
-  @override
-  String get reasoningBudgetSheetMax => '全力推理';
-
-  @override
   String get reasoningBudgetSheetTitle => '思维链强度';
-
-  @override
-  String reasoningBudgetSheetCurrentLevel(String level) {
-    return '当前档位：$level';
-  }
-
-  @override
-  String get reasoningBudgetSheetOffSubtitle => '关闭推理功能，直接回答';
-
-  @override
-  String get reasoningBudgetSheetAutoSubtitle => '由模型自动决定推理级别';
-
-  @override
-  String get reasoningBudgetSheetLightSubtitle => '使用少量推理来回答问题';
-
-  @override
-  String get reasoningBudgetSheetMediumSubtitle => '使用较多推理来回答问题';
-
-  @override
-  String get reasoningBudgetSheetHeavySubtitle => '使用大量推理来回答问题，适合复杂问题';
-
-  @override
-  String get reasoningBudgetSheetXhighSubtitle => '使用最大推理深度，适合最复杂的问题';
 
   @override
   String get reasoningBudgetSheetCustomLabel => '自定义推理预算';
@@ -8896,21 +8852,6 @@ class AppLocalizationsZh extends AppLocalizations {
       '定位权限已被禁止。请在系统设置中允许定位访问，然后重新开启此工具。';
 
   @override
-  String get reasoningBudgetSliderLow => 'Low';
-
-  @override
-  String get reasoningBudgetSliderMedium => 'Medium';
-
-  @override
-  String get reasoningBudgetSliderHigh => 'High';
-
-  @override
-  String get reasoningBudgetSliderXhigh => 'XHigh';
-
-  @override
-  String get reasoningBudgetSliderMax => 'Max';
-
-  @override
   String autoRetryCountdown(int seconds, int attempt, int maxRetries) {
     return '$seconds 秒后重试 ($attempt/$maxRetries)';
   }
@@ -11596,6 +11537,13 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get displaySettingsPageShowProducedFilesSubtitle =>
       '在回复底部显示工具创建或修改的文件。';
+
+  @override
+  String get displaySettingsPageShowReasoningLevelBadgeTitle => '在按钮上显示推理档位';
+
+  @override
+  String get displaySettingsPageShowReasoningLevelBadgeSubtitle =>
+      '在输入栏的推理图标旁显示当前档位。';
 
   @override
   String get googleFontsTitle => 'Google Fonts';
@@ -15743,51 +15691,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get messageMoreSheetDeleteAllVersions => '删除所有分支';
 
   @override
-  String get reasoningBudgetSheetOff => '关闭';
-
-  @override
-  String get reasoningBudgetSheetAuto => '自动';
-
-  @override
-  String get reasoningBudgetSheetLight => '轻度推理';
-
-  @override
-  String get reasoningBudgetSheetMedium => '中度推理';
-
-  @override
-  String get reasoningBudgetSheetHeavy => '重度推理';
-
-  @override
-  String get reasoningBudgetSheetXhigh => '极限推理';
-
-  @override
-  String get reasoningBudgetSheetMax => '全力推理';
-
-  @override
   String get reasoningBudgetSheetTitle => '思维链强度';
-
-  @override
-  String reasoningBudgetSheetCurrentLevel(String level) {
-    return '当前档位：$level';
-  }
-
-  @override
-  String get reasoningBudgetSheetOffSubtitle => '关闭推理功能，直接回答';
-
-  @override
-  String get reasoningBudgetSheetAutoSubtitle => '由模型自动决定推理级别';
-
-  @override
-  String get reasoningBudgetSheetLightSubtitle => '使用少量推理来回答问题';
-
-  @override
-  String get reasoningBudgetSheetMediumSubtitle => '使用较多推理来回答问题';
-
-  @override
-  String get reasoningBudgetSheetHeavySubtitle => '使用大量推理来回答问题，适合复杂问题';
-
-  @override
-  String get reasoningBudgetSheetXhighSubtitle => '使用最大推理深度，适合最复杂的问题';
 
   @override
   String get reasoningBudgetSheetCustomLabel => '自定义推理预算';
@@ -22076,21 +21980,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '定位权限已被禁止。请在系统设置中允许定位访问，然后重新开启此工具。';
 
   @override
-  String get reasoningBudgetSliderLow => 'Low';
-
-  @override
-  String get reasoningBudgetSliderMedium => 'Medium';
-
-  @override
-  String get reasoningBudgetSliderHigh => 'High';
-
-  @override
-  String get reasoningBudgetSliderXhigh => 'XHigh';
-
-  @override
-  String get reasoningBudgetSliderMax => 'Max';
-
-  @override
   String autoRetryCountdown(int seconds, int attempt, int maxRetries) {
     return '$seconds 秒后重试 ($attempt/$maxRetries)';
   }
@@ -24776,6 +24665,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String get displaySettingsPageShowProducedFilesSubtitle =>
       '在回复底部显示工具创建或修改的文件。';
+
+  @override
+  String get displaySettingsPageShowReasoningLevelBadgeTitle => '在按钮上显示推理档位';
+
+  @override
+  String get displaySettingsPageShowReasoningLevelBadgeSubtitle =>
+      '在输入栏的推理图标旁显示当前档位。';
 
   @override
   String get googleFontsTitle => 'Google Fonts';
@@ -28923,51 +28819,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get messageMoreSheetDeleteAllVersions => '刪除所有分支';
 
   @override
-  String get reasoningBudgetSheetOff => '關閉';
-
-  @override
-  String get reasoningBudgetSheetAuto => '自動';
-
-  @override
-  String get reasoningBudgetSheetLight => '輕度推理';
-
-  @override
-  String get reasoningBudgetSheetMedium => '中度推理';
-
-  @override
-  String get reasoningBudgetSheetHeavy => '重度推理';
-
-  @override
-  String get reasoningBudgetSheetXhigh => '極限推理';
-
-  @override
-  String get reasoningBudgetSheetMax => '全力推理';
-
-  @override
   String get reasoningBudgetSheetTitle => '思維鏈強度';
-
-  @override
-  String reasoningBudgetSheetCurrentLevel(String level) {
-    return '目前檔位：$level';
-  }
-
-  @override
-  String get reasoningBudgetSheetOffSubtitle => '關閉推理功能，直接回答';
-
-  @override
-  String get reasoningBudgetSheetAutoSubtitle => '由模型自動決定推理級別';
-
-  @override
-  String get reasoningBudgetSheetLightSubtitle => '使用少量推理來回答問題';
-
-  @override
-  String get reasoningBudgetSheetMediumSubtitle => '使用較多推理來回答問題';
-
-  @override
-  String get reasoningBudgetSheetHeavySubtitle => '使用大量推理來回答問題，適合複雜問題';
-
-  @override
-  String get reasoningBudgetSheetXhighSubtitle => '使用最大推理深度，適合最複雜的問題';
 
   @override
   String get reasoningBudgetSheetCustomLabel => '自訂推理預算';
@@ -35258,21 +35110,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       '定位權限已被禁止。請在系統設定中允許定位存取，然後重新開啟此工具。';
 
   @override
-  String get reasoningBudgetSliderLow => 'Low';
-
-  @override
-  String get reasoningBudgetSliderMedium => 'Medium';
-
-  @override
-  String get reasoningBudgetSliderHigh => 'High';
-
-  @override
-  String get reasoningBudgetSliderXhigh => 'XHigh';
-
-  @override
-  String get reasoningBudgetSliderMax => 'Max';
-
-  @override
   String autoRetryCountdown(int seconds, int attempt, int maxRetries) {
     return '$seconds 秒後重試 ($attempt/$maxRetries)';
   }
@@ -37960,6 +37797,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get displaySettingsPageShowProducedFilesSubtitle =>
       '在回覆底部顯示工具建立或修改的檔案。';
+
+  @override
+  String get displaySettingsPageShowReasoningLevelBadgeTitle => '在按鈕上顯示推理檔位';
+
+  @override
+  String get displaySettingsPageShowReasoningLevelBadgeSubtitle =>
+      '在輸入欄的推理圖示旁顯示目前檔位。';
 
   @override
   String get googleFontsTitle => 'Google Fonts';

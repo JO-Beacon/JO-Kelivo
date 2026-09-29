@@ -2665,57 +2665,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get messageMoreSheetDeleteAllVersions => 'Delete All Branches';
 
   @override
-  String get reasoningBudgetSheetOff => 'Off';
-
-  @override
-  String get reasoningBudgetSheetAuto => 'Auto';
-
-  @override
-  String get reasoningBudgetSheetLight => 'Light Reasoning';
-
-  @override
-  String get reasoningBudgetSheetMedium => 'Medium Reasoning';
-
-  @override
-  String get reasoningBudgetSheetHeavy => 'Heavy Reasoning';
-
-  @override
-  String get reasoningBudgetSheetXhigh => 'Extreme Reasoning';
-
-  @override
-  String get reasoningBudgetSheetMax => 'Maximum Reasoning';
-
-  @override
   String get reasoningBudgetSheetTitle => 'Reasoning Chain Strength';
-
-  @override
-  String reasoningBudgetSheetCurrentLevel(String level) {
-    return 'Current Level: $level';
-  }
-
-  @override
-  String get reasoningBudgetSheetOffSubtitle =>
-      'Turn off reasoning, answer directly';
-
-  @override
-  String get reasoningBudgetSheetAutoSubtitle =>
-      'Let the model decide reasoning level automatically';
-
-  @override
-  String get reasoningBudgetSheetLightSubtitle =>
-      'Use light reasoning to answer questions';
-
-  @override
-  String get reasoningBudgetSheetMediumSubtitle =>
-      'Use moderate reasoning to answer questions';
-
-  @override
-  String get reasoningBudgetSheetHeavySubtitle =>
-      'Use heavy reasoning for complex questions';
-
-  @override
-  String get reasoningBudgetSheetXhighSubtitle =>
-      'Use maximum reasoning depth for the toughest problems';
 
   @override
   String get reasoningBudgetSheetCustomLabel => 'Custom Reasoning Budget';
@@ -9302,21 +9252,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Location permission is blocked. Allow location access in system settings, then turn this tool on again.';
 
   @override
-  String get reasoningBudgetSliderLow => 'Low';
-
-  @override
-  String get reasoningBudgetSliderMedium => 'Medium';
-
-  @override
-  String get reasoningBudgetSliderHigh => 'High';
-
-  @override
-  String get reasoningBudgetSliderXhigh => 'XHigh';
-
-  @override
-  String get reasoningBudgetSliderMax => 'Max';
-
-  @override
   String autoRetryCountdown(int seconds, int attempt, int maxRetries) {
     return '${seconds}s until retry ($attempt/$maxRetries)';
   }
@@ -12138,6 +12073,14 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get displaySettingsPageShowProducedFilesSubtitle =>
       'Show files created or modified by tools below replies.';
+
+  @override
+  String get displaySettingsPageShowReasoningLevelBadgeTitle =>
+      'Show Reasoning Level on the Button';
+
+  @override
+  String get displaySettingsPageShowReasoningLevelBadgeSubtitle =>
+      'Show the current level next to the reasoning icon in the input bar.';
 
   @override
   String get googleFontsTitle => 'Google Fonts';

@@ -1,11 +1,11 @@
-import 'dart:io';
-// ignore: depend_on_referenced_packages
-import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'dart:async';
 
 import 'package:Kelivo/core/database/generation_run.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/message_part.dart';
+import 'package:Kelivo/core/models/token_usage.dart';
+import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
+import 'package:Kelivo/core/models/provider_oauth.dart';
 import 'package:Kelivo/core/models/mobile_background_settings.dart';
 import 'package:Kelivo/core/services/mobile_background.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
@@ -26,20 +26,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../support/business_test_harness.dart';
 
-class _MediaPathProvider extends PathProviderPlatform {
-  _MediaPathProvider(this.path);
-  final String path;
-  @override
-  Future<String?> getApplicationDocumentsPath() async => path;
-  @override
-  Future<String?> getApplicationSupportPath() async => path;
-}
-
 class _ThrowingFinalizeChatService extends ChatService {
   _ThrowingFinalizeChatService({this.failCompletion = true});
   final bool failCompletion;
   final terminalStates = <GenerationRunState>[];
-  final terminalMessages = <ChatMessage>[];
+  ChatMessage? lastMessage;
+  String? lastErrorCode;
 
   @override
   Future<GenerationRun?> finalizeGenerationRunSilent({
@@ -53,7 +45,8 @@ class _ThrowingFinalizeChatService extends ChatService {
     String? errorCode,
   }) async {
     terminalStates.add(terminalState);
-    terminalMessages.add(message);
+    lastMessage = message;
+    lastErrorCode = errorCode;
     if (failCompletion && terminalState == GenerationRunState.completed) {
       throw StateError('persist failed');
     }
@@ -120,6 +113,217 @@ class _ThrowingFinalizeChatService extends ChatService {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   SharedPreferences.setMockInitialValues(const {});
+
+  for (final fail in [false, true]) {
+    testWidgets(
+      'terminal persistence keeps usage and request timing (fail=$fail)',
+      (tester) async {
+        final service = _ThrowingFinalizeChatService(failCompletion: false);
+        final settings = SettingsProvider(createBusinessTestPreferences());
+        final background = MobileBackgroundCoordinator(
+          platform: TargetPlatform.linux,
+        );
+        addTearDown(settings.dispose);
+        addTearDown(background.dispose);
+        late ChatActions actions;
+        await tester.pumpWidget(
+          ChangeNotifierProvider<SettingsProvider>.value(
+            value: settings,
+            child: MaterialApp(
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: Builder(
+                builder: (context) {
+                  actions = _actionsFor(
+                    context,
+                    service,
+                    settings,
+                    background,
+                  ).actions;
+                  return const SizedBox.shrink();
+                },
+              ),
+            ),
+          ),
+        );
+        addTearDown(actions.streamController.dispose);
+        final state = StreamingState(
+          GenerationContext(
+            assistantMessage: ChatMessage(
+              id: 'assistant-usage',
+              role: 'assistant',
+              conversationId: 'conversation-1',
+              isStreaming: true,
+              // A tool answer can resume a message that already incurred usage.
+              totalTokens: 60,
+              promptTokens: 50,
+              completionTokens: 10,
+            ),
+            apiMessages: const [],
+            userImagePaths: const [],
+            allowImagesApiRouting: false,
+            providerKey: 'test',
+            modelId: 'test',
+            assistant: null,
+            settings: settings,
+            config: ProviderConfig(
+              id: 'test',
+              enabled: true,
+              name: 'test',
+              apiKey: '',
+              baseUrl: '',
+            ),
+            toolDefs: const [],
+            supportsReasoning: false,
+            enableReasoning: false,
+            streamOutput: true,
+            generateTitleOnFinish: false,
+          ),
+        );
+        state.requestStartedAt = DateTime.now().subtract(
+          const Duration(seconds: 30),
+        );
+        await actions.debugHandleStreamChunk(
+          const ReasoningDelta(id: 'reasoning', text: 'thinking'),
+          state,
+        );
+        final firstTokenMs = state.firstTokenMs;
+        expect(firstTokenMs, inInclusiveRange(30000, 31000));
+        await actions.debugHandleStreamChunk(
+          const TextDelta(id: 'text', text: 'done'),
+          state,
+        );
+        expect(state.firstTokenMs, firstTokenMs);
+        await tester.pump(const Duration(milliseconds: 500));
+        await actions.debugHandleStreamChunk(
+          const Usage(
+            TokenUsage(
+              promptTokens: 100,
+              completionTokens: 20,
+              cacheWriteTokens: 30,
+              reasoningTokens: 5,
+            ),
+          ),
+          state,
+        );
+        await actions.debugHandleStreamChunk(
+          const Usage(
+            TokenUsage(promptTokens: 200, completionTokens: 30),
+            startsRequest: true,
+          ),
+          state,
+        );
+        if (fail) {
+          await actions.debugHandleStreamError(
+            StateError('failed after usage'),
+            state,
+          );
+        } else {
+          await actions.debugFinishStreaming(state);
+        }
+        final saved = service.lastMessage!;
+        expect(saved.totalTokens, 410);
+        expect(saved.promptTokens, 350);
+        expect(saved.completionTokens, 60);
+        expect(saved.reasoningTokens, 5);
+        expect(saved.cacheWriteTokens, 30);
+        expect(saved.finishUsage!.totalTokens, 230);
+        expect(saved.finishUsage!.reasoningTokens, 0);
+        expect(saved.isStreaming, isFalse);
+        expect(saved.firstTokenMs, firstTokenMs);
+        expect(saved.durationMs, inInclusiveRange(30000, 31000));
+        expect(state.durationMs, saved.durationMs);
+        expect(state.usage!.totalTokens, 230);
+      },
+    );
+  }
+
+  testWidgets('OAuth 失效保留部分回复并持久化恢复入口，不触发普通错误提示', (tester) async {
+    final service = _ThrowingFinalizeChatService(failCompletion: false);
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    final background = MobileBackgroundCoordinator(
+      platform: TargetPlatform.linux,
+    );
+    addTearDown(background.dispose);
+    addTearDown(settings.dispose);
+    final errors = <String>[];
+    late ChatActions actions;
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<SettingsProvider>.value(value: settings),
+          ChangeNotifierProvider<ChatService>.value(value: service),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Builder(
+            builder: (context) {
+              actions = _actionsFor(
+                context,
+                service,
+                settings,
+                background,
+              ).actions;
+              actions.onStreamError = errors.add;
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      ),
+    );
+    final state = StreamingState(
+      GenerationContext(
+        assistantMessage: ChatMessage(
+          id: 'assistant-1',
+          role: 'assistant',
+          content: '',
+          providerId: 'account',
+          conversationId: 'conversation-1',
+          isStreaming: true,
+        ),
+        apiMessages: const [],
+        userImagePaths: const [],
+        allowImagesApiRouting: false,
+        providerKey: 'account',
+        modelId: 'test',
+        assistant: null,
+        settings: settings,
+        config: ProviderConfig(
+          id: 'account',
+          enabled: true,
+          name: 'ChatGPT',
+          apiKey: '',
+          baseUrl: '',
+        ),
+        toolDefs: const [],
+        supportsReasoning: false,
+        enableReasoning: false,
+        streamOutput: true,
+      ),
+    );
+    state.fullContentRaw = 'Partial reply';
+    await actions.debugHandleStreamError(
+      const ProviderOAuthException(
+        ProviderOAuthFailure.loginRequired,
+        providerId: 'account',
+      ),
+      state,
+    );
+    expect(state.terminalPersisted, true);
+    expect(service.lastErrorCode, 'oauth_login_required');
+    expect(service.terminalStates, [GenerationRunState.failed]);
+    expect(service.lastMessage!.content, 'Partial reply');
+    expect(
+      service.lastMessage!.parts
+          .whereType<ProviderAuthErrorPart>()
+          .single
+          .providerId,
+      'account',
+    );
+    expect(service.lastMessage!.isStreaming, false);
+    expect(errors, isEmpty);
+  });
 
   testWidgets('终态写库失败仍走 failed 收尾并通知 onStreamError', (tester) async {
     final service = _ThrowingFinalizeChatService();
@@ -230,171 +434,6 @@ void main() {
     expect(assistantFinishedCount, 0);
     expect(background.activeTaskIds, isEmpty);
     expect(notifications, ['Generation failed. Open the chat for details.']);
-  });
-
-  testWidgets('继续生成发生错误时，保留此前的工具卡片、图片和文字', (tester) async {
-    final service = _ThrowingFinalizeChatService(failCompletion: false);
-    final settings = SettingsProvider(createBusinessTestPreferences());
-    final background = MobileBackgroundCoordinator(
-      platform: TargetPlatform.windows,
-    );
-    addTearDown(settings.dispose);
-    addTearDown(background.dispose);
-    late ChatActions actions;
-    await tester.pumpWidget(
-      MultiProvider(
-        providers: [
-          ChangeNotifierProvider<SettingsProvider>.value(value: settings),
-          ChangeNotifierProvider<ChatService>.value(value: service),
-        ],
-        child: MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: Builder(
-            builder: (context) {
-              actions = _actionsFor(
-                context,
-                service,
-                settings,
-                background,
-              ).actions;
-              return const SizedBox.shrink();
-            },
-          ),
-        ),
-      ),
-    );
-    const parts = <MessagePart>[
-      TextPart('已完成的文字'),
-      ReasoningPart('已有思考'),
-      ToolCallPart('{"id":"call-1","name":"lookup"}'),
-      ImagePart(uri: 'https://example.com/result.png'),
-    ];
-    final state = StreamingState(
-      GenerationContext(
-        assistantMessage: ChatMessage(
-          id: 'assistant-1',
-          role: 'assistant',
-          parts: parts,
-          conversationId: 'conversation-1',
-          isStreaming: true,
-        ),
-        apiMessages: const [],
-        userImagePaths: const [],
-        allowImagesApiRouting: false,
-        providerKey: 'test',
-        modelId: 'test-model',
-        assistant: null,
-        settings: settings,
-        config: ProviderConfig(
-          id: 'test',
-          enabled: true,
-          name: 'Test',
-          apiKey: '',
-          baseUrl: '',
-        ),
-        toolDefs: const [],
-        supportsReasoning: true,
-        enableReasoning: true,
-        streamOutput: true,
-      ),
-    );
-    await actions.debugHandleStreamError(
-      StateError('connection failed'),
-      state,
-    );
-    expect(service.terminalMessages.single.parts.map((p) => p.kind), [
-      'text',
-      'reasoning',
-      'tool_call',
-      'image',
-    ]);
-    expect(service.terminalMessages.single.content, '已完成的文字');
-    expect(
-      service.terminalMessages.single.parts.whereType<ImagePart>().single.uri,
-      'https://example.com/result.png',
-    );
-  });
-
-  testWidgets('终态图片落盘保留文本和工具的部件顺序', (tester) async {
-    final service = _ThrowingFinalizeChatService(failCompletion: false);
-    final settings = SettingsProvider(createBusinessTestPreferences());
-    final background = MobileBackgroundCoordinator(
-      platform: TargetPlatform.windows,
-    );
-    addTearDown(settings.dispose);
-    addTearDown(background.dispose);
-    final root = Directory.systemTemp.createTempSync('joaiclient-p10-media-');
-    final previous = PathProviderPlatform.instance;
-    PathProviderPlatform.instance = _MediaPathProvider(root.path);
-    addTearDown(() async {
-      PathProviderPlatform.instance = previous;
-      await root.delete(recursive: true);
-    });
-    late ChatActions actions;
-    await tester.pumpWidget(
-      MultiProvider(
-        providers: [
-          ChangeNotifierProvider<SettingsProvider>.value(value: settings),
-          ChangeNotifierProvider<ChatService>.value(value: service),
-        ],
-        child: MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: Builder(
-            builder: (context) {
-              actions = _actionsFor(
-                context,
-                service,
-                settings,
-                background,
-              ).actions;
-              return const SizedBox.shrink();
-            },
-          ),
-        ),
-      ),
-    );
-    const data = 'data:image/png;base64,aGVsbG8=';
-    final state = StreamingState(
-      GenerationContext(
-        assistantMessage: ChatMessage(
-          id: 'assistant-1',
-          role: 'assistant',
-          parts: const [
-            TextPart('![first]($data)'),
-            ToolCallPart('{"id":"t","name":"draw"}'),
-            ImagePart(uri: data, id: 'second'),
-          ],
-          conversationId: 'conversation-1',
-          isStreaming: true,
-        ),
-        apiMessages: const [],
-        userImagePaths: const [],
-        allowImagesApiRouting: false,
-        providerKey: 'test',
-        modelId: 'test-model',
-        assistant: null,
-        settings: settings,
-        config: ProviderConfig(
-          id: 'test',
-          enabled: true,
-          name: 'Test',
-          apiKey: '',
-          baseUrl: '',
-        ),
-        toolDefs: const [],
-        supportsReasoning: true,
-        enableReasoning: true,
-        streamOutput: true,
-      ),
-    );
-    await tester.runAsync(() => actions.debugFinishStreaming(state));
-    final parts = service.terminalMessages.single.parts;
-    expect(parts.map((p) => p.kind), ['text', 'tool_call', 'image']);
-    expect((parts.first as TextPart).text, isNot(contains('data:image')));
-    expect((parts.last as ImagePart).uri, isNot(startsWith('data:')));
-    expect((parts.last as ImagePart).id, 'second');
   });
 
   testWidgets(

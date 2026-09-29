@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:Kelivo/core/models/assistant.dart';
+import 'package:Kelivo/core/models/reasoning_request.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 
 import '../../support/business_preferences_test_harness.dart';
@@ -36,9 +38,15 @@ void main() {
     final provider = AssistantProvider(preferences: session.preferences);
     await provider.loaded;
 
-    expect(provider.getById('untouched')?.thinkingBudget, 16000);
+    expect(
+      provider.getById('untouched')?.reasoning,
+      Assistant.reasoningFromLegacyBudget(16000),
+    );
     // 已有显式档位的助手不得被覆盖。
-    expect(provider.getById('explicit')?.thinkingBudget, 32000);
+    expect(
+      provider.getById('explicit')?.reasoning,
+      Assistant.reasoningFromLegacyBudget(32000),
+    );
     // 键被消费后清除，因此重复执行是空操作。
     expect(session.preferences.getInt('thinking_budget_v1'), isNull);
   });
@@ -51,7 +59,7 @@ void main() {
     final provider = AssistantProvider(preferences: session.preferences);
     await provider.loaded;
 
-    expect(provider.getById('a')?.thinkingBudget, isNull);
+    expect(provider.getById('a')?.reasoning, isNull);
   });
 
   test('所有助手都已有档位时，键仍被清除且不改写任何值', () async {
@@ -63,7 +71,7 @@ void main() {
     final provider = AssistantProvider(preferences: session.preferences);
     await provider.loaded;
 
-    expect(provider.getById('a')?.thinkingBudget, 0);
+    expect(provider.getById('a')?.reasoning, ReasoningRequest.off);
     expect(session.preferences.getInt('thinking_budget_v1'), isNull);
   });
 }

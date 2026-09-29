@@ -6,8 +6,8 @@ import '../icons/lucide_adapter.dart' as lucide;
 import '../l10n/app_localizations.dart';
 import '../core/providers/settings_provider.dart';
 import '../core/providers/model_provider.dart';
+import '../core/services/model_spec/model_spec_resolver.dart';
 import '../core/services/api/builtin_tools.dart';
-import '../core/services/model_override_resolver.dart';
 import '../core/services/logging/flutter_logger.dart';
 import '../shared/widgets/ios_switch.dart';
 import '../shared/widgets/snackbar.dart';
@@ -166,20 +166,15 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
       if (raw != null && raw.isNotEmpty) displayModelId = raw;
     }
     _idCtrl = TextEditingController(text: displayModelId);
-    final base = ModelRegistry.infer(
-      ModelInfo(
-        id: displayModelId.isEmpty ? 'custom' : displayModelId,
-        displayName: displayModelId.isEmpty ? '' : displayModelId,
-      ),
+    final base = ModelSpecResolver.instance.spec(
+      cfg,
+      displayModelId.isEmpty ? 'custom' : displayModelId,
+      displayName: displayModelId.isEmpty ? '' : displayModelId,
     );
     final ov = initialOv;
     final effective = ov == null
         ? base
-        : ModelOverrideResolver.applyModelOverride(
-            base,
-            ov,
-            applyDisplayName: true,
-          );
+        : ModelSpecOverride.fromJson(ov).applyTo(base, applyDisplayName: true);
     _nameCtrl = TextEditingController(text: effective.displayName);
     _type = effective.type;
     _input

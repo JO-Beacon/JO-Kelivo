@@ -238,9 +238,13 @@ final class Annotations extends StreamChunk {
 }
 
 final class Usage extends StreamChunk {
-  const Usage(this.usage);
+  const Usage(this.usage, {this.startsRequest = false});
 
   final TokenUsage usage;
+
+  /// 本轮对话中「另一次 API 请求」的首次用量快照。
+  /// 同一次请求内的后续快照是覆盖计数，不是增量。
+  final bool startsRequest;
 }
 
 final class Finish extends StreamChunk {

@@ -1,5 +1,7 @@
 import "../../../support/business_test_harness.dart";
 import 'package:Kelivo/core/models/chat_input_data.dart';
+import 'package:Kelivo/core/models/model_spec.dart';
+import 'package:Kelivo/core/models/reasoning_request.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/features/home/widgets/chat_input_bar.dart';
@@ -33,6 +35,10 @@ void main() {
     bool backgroundImageActive = false,
     double inputBackgroundOpacityLight = 0.8236,
     double inputBackgroundOpacityDark = 0.7396,
+    bool supportsReasoning = false,
+    ReasoningRequest? reasoning,
+    bool reasoningCustomBudget = false,
+    bool reasoningActive = false,
   }) {
     return MultiProvider(
       providers: [
@@ -70,6 +76,10 @@ void main() {
             backgroundImageActive: backgroundImageActive,
             inputBackgroundOpacityLight: inputBackgroundOpacityLight,
             inputBackgroundOpacityDark: inputBackgroundOpacityDark,
+            supportsReasoning: supportsReasoning,
+            reasoning: reasoning,
+            reasoningCustomBudget: reasoningCustomBudget,
+            reasoningActive: reasoningActive,
           ),
         ),
       ),
@@ -532,6 +542,102 @@ void main() {
 
     controller.dispose();
     focusNode.dispose();
+  });
+
+  // 与上游有意分歧：上游该项默认关，本仓库默认开。
+  testWidgets('推理按钮默认在图标旁显示当前档位', (tester) async {
+    final controller = TextEditingController();
+    final focusNode = FocusNode();
+    addTearDown(controller.dispose);
+    addTearDown(focusNode.dispose);
+
+    await tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        onSend: (_) async => ChatInputSubmissionResult.rejected,
+        supportsReasoning: true,
+        reasoning: const ReasoningRequest(ReasoningLevel.low),
+        reasoningActive: true,
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('low'), findsOneWidget);
+  });
+
+  testWidgets('关闭设置后推理按钮只剩图标', (tester) async {
+    final controller = TextEditingController();
+    final focusNode = FocusNode();
+    addTearDown(controller.dispose);
+    addTearDown(focusNode.dispose);
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    addTearDown(settings.dispose);
+    await settings.loaded;
+    await settings.setShowReasoningLevelBadge(false);
+
+    await tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        onSend: (_) async => ChatInputSubmissionResult.rejected,
+        settingsProvider: settings,
+        supportsReasoning: true,
+        reasoning: const ReasoningRequest(ReasoningLevel.low),
+        reasoningActive: true,
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('low'), findsNothing);
+  });
+
+  testWidgets('自动与关闭档位不显示文字', (tester) async {
+    final controller = TextEditingController();
+    final focusNode = FocusNode();
+    addTearDown(controller.dispose);
+    addTearDown(focusNode.dispose);
+
+    for (final level in [ReasoningLevel.auto, ReasoningLevel.off]) {
+      await tester.pumpWidget(
+        buildHarness(
+          controller: controller,
+          focusNode: focusNode,
+          onSend: (_) async => ChatInputSubmissionResult.rejected,
+          supportsReasoning: true,
+          reasoning: ReasoningRequest(level),
+          reasoningActive: true,
+        ),
+      );
+      await tester.pump();
+      expect(find.text('auto'), findsNothing);
+      expect(find.text('off'), findsNothing);
+    }
+  });
+
+  testWidgets('自定义 token 档位显示换算后的字数', (tester) async {
+    final controller = TextEditingController();
+    final focusNode = FocusNode();
+    addTearDown(controller.dispose);
+    addTearDown(focusNode.dispose);
+
+    await tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        onSend: (_) async => ChatInputSubmissionResult.rejected,
+        supportsReasoning: true,
+        reasoning: const ReasoningRequest(
+          ReasoningLevel.auto,
+          budgetTokens: 2048,
+        ),
+        reasoningCustomBudget: true,
+        reasoningActive: true,
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('2.0k'), findsOneWidget);
   });
 }
 

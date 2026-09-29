@@ -1,6 +1,6 @@
 import 'package:Kelivo/core/services/api/providers/openai/chat_completions_api.dart';
+import 'package:Kelivo/core/models/model_spec.dart';
 import 'package:Kelivo/core/services/api/providers/openai/openai_tool_transcript.dart';
-import 'package:Kelivo/core/services/api/providers/openai/openai_vendor_compat.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 // Google 的 OpenAI 兼容端点把思考签名挂在工具调用的 extra_content 上，
@@ -128,7 +128,7 @@ void main() {
         ],
         canImageInput: false,
         allowRemoteImages: false,
-        reasoningContentReplayPolicy: ReasoningContentReplayPolicy.none,
+        reasoningReplay: ReasoningReplayPolicy.none,
         supportsGoogleOpenAIThoughtSignatures: true,
       );
 
@@ -179,7 +179,7 @@ void main() {
       ],
       canImageInput: false,
       allowRemoteImages: false,
-      reasoningContentReplayPolicy: ReasoningContentReplayPolicy.none,
+      reasoningReplay: ReasoningReplayPolicy.none,
     );
 
     final assistant = messages.firstWhere(

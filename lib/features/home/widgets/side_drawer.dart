@@ -1031,9 +1031,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     if (titleModelProvider == null || titleModelId == null) return;
 
     final cfg = settings.getProviderConfig(titleModelProvider);
-    final budget = settings.titleGenerationThinkingBudgetFor(
-      assistant?.thinkingBudget,
-    );
+    final reasoning = settings.titleGenerationReasoningFor(assistant);
     final locale = Localizations.localeOf(context).toLanguageTag();
 
     try {
@@ -1048,7 +1046,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
         config: cfg,
         modelId: titleModelId,
         prompt: prompt,
-        thinkingBudget: budget,
+        reasoning: reasoning,
       )).trim();
       if (title.isNotEmpty) {
         await chatService.renameConversation(conversationId, title);

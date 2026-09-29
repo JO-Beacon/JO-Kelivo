@@ -253,13 +253,7 @@ class GoogleStreamDecoder implements StreamChunkDecoder {
   void _parseEvent(Map<String, dynamic> obj, List<StreamChunk> chunks) {
     final um = obj['usageMetadata'];
     if (um is Map<String, dynamic>) {
-      usage = (usage ?? const TokenUsage()).merge(
-        TokenUsage(
-          promptTokens: (um['promptTokenCount'] ?? 0) as int,
-          completionTokens: (um['candidatesTokenCount'] ?? 0) as int,
-          totalTokens: (um['totalTokenCount'] ?? 0) as int,
-        ),
-      );
+      usage = (usage ?? const TokenUsage()).merge(googleUsageFromMetadata(um));
       chunks.add(Usage(usage!));
     }
 
@@ -572,4 +566,27 @@ bool _looksLikeImageStart(String data) {
     if (data.startsWith(prefix)) return true;
   }
   return false;
+}
+
+int? _readGoogleUsageInt(dynamic value) {
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  if (value is String) return int.tryParse(value);
+  return null;
+}
+
+/// 把 Gemini 的 `usageMetadata` 映射成统一用量。
+TokenUsage googleUsageFromMetadata(Map usageMetadata) {
+  final reasoning = _readGoogleUsageInt(usageMetadata['thoughtsTokenCount']);
+  final candidates = _readGoogleUsageInt(usageMetadata['candidatesTokenCount']);
+  return TokenUsage(
+    promptTokens: _readGoogleUsageInt(usageMetadata['promptTokenCount']),
+    // Gemini 把思考 token 单独报；完成量应是候选输出与思考之和。
+    completionTokens: candidates == null && reasoning == null
+        ? null
+        : (candidates ?? 0) + (reasoning ?? 0),
+    cachedTokens: _readGoogleUsageInt(usageMetadata['cachedContentTokenCount']),
+    reasoningTokens: reasoning,
+    totalTokens: _readGoogleUsageInt(usageMetadata['totalTokenCount']),
+  );
 }

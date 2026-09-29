@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+import '../../../core/models/model_spec.dart';
+import '../../../shared/widgets/context_usage_ring.dart';
+import '../services/context_usage_service.dart';
+import '../../../core/models/reasoning_request.dart';
+import '../../../core/services/api/reasoning/reasoning_level_options.dart';
 import '../../../core/services/incoming_share_service.dart';
 import 'composer_attachment_card.dart';
 import 'dart:collection';
@@ -10,6 +15,7 @@ import '../../../icons/reasoning_icons.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../chat/widgets/reasoning_level_sheet.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../utils/file_import_helper.dart';
 import '../../../utils/image_compressor.dart';
@@ -130,6 +136,7 @@ class ChatInputBar extends StatefulWidget {
     this.onOpenSearch,
     this.onMore,
     this.onConfigureReasoning,
+    this.onOpenContextUsage,
     this.moreOpen = false,
     this.focusNode,
     this.modelIcon,
@@ -141,7 +148,8 @@ class ChatInputBar extends StatefulWidget {
     this.queuedPreviewText,
     this.onCancelQueuedInput,
     this.reasoningActive = false,
-    this.reasoningBudget,
+    this.reasoning,
+    this.reasoningCustomBudget = false,
     this.supportsReasoning = true,
     this.showToolsButton = false,
     this.toolsActive = false,
@@ -190,6 +198,7 @@ class ChatInputBar extends StatefulWidget {
   final VoidCallback? onOpenSearch;
   final VoidCallback? onMore;
   final VoidCallback? onConfigureReasoning;
+  final VoidCallback? onOpenContextUsage;
   final bool moreOpen;
   final FocusNode? focusNode;
   final Widget? modelIcon;
@@ -201,7 +210,8 @@ class ChatInputBar extends StatefulWidget {
   final String? queuedPreviewText;
   final VoidCallback? onCancelQueuedInput;
   final bool reasoningActive;
-  final int? reasoningBudget;
+  final ReasoningRequest? reasoning;
+  final bool reasoningCustomBudget;
   final bool supportsReasoning;
   final bool showToolsButton;
   final bool toolsActive;
@@ -561,6 +571,21 @@ class _ChatInputBarState extends State<ChatInputBar>
     });
   }
 
+  String? _usageDraftConversationId;
+  String? _usageDraftText;
+
+  /// 把草稿文本同步给用量服务：估算要跟着输入实时更新。
+  void _syncUsageDraft() {
+    if (!mounted) return;
+    final id = widget.conversationId;
+    if (id == null || id.isEmpty) return;
+    final text = _controller.text;
+    if (_usageDraftConversationId == id && _usageDraftText == text) return;
+    _usageDraftConversationId = id;
+    _usageDraftText = text;
+    context.read<ContextUsageService?>()?.updateDraft(id, text);
+  }
+
   void _removeDocumentAt(int index) {
     setState(() => _docs.removeAt(index));
   }
@@ -569,6 +594,8 @@ class _ChatInputBarState extends State<ChatInputBar>
   void initState() {
     super.initState();
     _controller = widget.controller ?? TextEditingController();
+    _controller.addListener(_syncUsageDraft);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncUsageDraft());
     widget.mediaController?._bind(this);
     widget.asrProvider?.addListener(_handleAsrChanged);
     WidgetsBinding.instance.addObserver(this);
@@ -599,6 +626,7 @@ class _ChatInputBarState extends State<ChatInputBar>
 
   @override
   void dispose() {
+    _controller.removeListener(_syncUsageDraft);
     WidgetsBinding.instance.removeObserver(this);
     _stopVoiceLevelSampling();
     final asr = widget.asrProvider;
@@ -1936,23 +1964,33 @@ class _ChatInputBarState extends State<ChatInputBar>
         );
 
         if (widget.supportsReasoning) {
+          final request = widget.reasoning ?? ReasoningRequest.auto;
+          final compactLabel = settings.showReasoningLevelBadge
+              ? _reasoningCompactLabel(
+                  l10n,
+                  request,
+                  customBudget: widget.reasoningCustomBudget,
+                )
+              : null;
           actions.add(
             _OverflowAction(
-              width: normalButtonW,
+              width: compactLabel == null
+                  ? normalButtonW
+                  : _reasoningButtonWidth(compactLabel),
               builder: () => _CompactIconButton(
                 tooltip: l10n.chatInputBarReasoningStrengthTooltip,
                 icon: Lucide.Brain,
                 active: widget.reasoningActive,
+                badge: compactLabel,
                 onTap: lockTap(widget.onConfigureReasoning),
-                childBuilder: (c) => ReasoningIcons.budgetIcon(
-                  widget.reasoningBudget,
-                  size: 20,
-                  color: c,
-                ),
+                childBuilder: (c) =>
+                    ReasoningIcons.levelIcon(request.level, size: 20, color: c),
               ),
               menu: DesktopContextMenuItem(
-                svgAsset: ReasoningIcons.assetForBudget(widget.reasoningBudget),
-                label: l10n.chatInputBarReasoningStrengthTooltip,
+                svgAsset: ReasoningIcons.assetForLevel(request.level),
+                label: compactLabel == null
+                    ? l10n.chatInputBarReasoningStrengthTooltip
+                    : '${l10n.chatInputBarReasoningStrengthTooltip} · $compactLabel',
                 onTap: lockTap(widget.onConfigureReasoning),
               ),
             ),
@@ -3055,6 +3093,16 @@ class _ChatInputBarState extends State<ChatInputBar>
                                               ),
                                               const SizedBox(width: 8),
                                             ],
+                                            if (!isMobileLayout &&
+                                                (widget.conversationId
+                                                        ?.isNotEmpty ??
+                                                    false))
+                                              _ContextUsageInputControl(
+                                                onTap: _composerLocked
+                                                    ? null
+                                                    : widget
+                                                          .onOpenContextUsage,
+                                              ),
                                             _CompactSendButton(
                                               enabled:
                                                   (hasText ||
@@ -3311,6 +3359,26 @@ class _OverflowAction {
 }
 
 // 集成输入栏的新紧凑按钮
+// New compact button for the integrated input bar
+String? _reasoningCompactLabel(
+  AppLocalizations l10n,
+  ReasoningRequest request, {
+  required bool customBudget,
+}) {
+  if (customBudget && request.budgetTokens != null) {
+    return formatReasoningBudgetK(request.budgetTokens!);
+  }
+  if (request.level == ReasoningLevel.off ||
+      request.level == ReasoningLevel.auto) {
+    return null;
+  }
+  return reasoningLevelCompactLabel(l10n, request.level);
+}
+
+double _reasoningButtonWidth(String label) {
+  return (32.0 + label.length * 7.0).clamp(48.0, 76.0);
+}
+
 class _CompactIconButton extends StatelessWidget {
   const _CompactIconButton({
     required this.icon,
@@ -3320,6 +3388,7 @@ class _CompactIconButton extends StatelessWidget {
     this.active = false,
     this.child,
     this.childBuilder,
+    this.badge,
     this.modelIcon = false,
   });
 
@@ -3330,6 +3399,7 @@ class _CompactIconButton extends StatelessWidget {
   final bool active;
   final Widget? child;
   final Widget Function(Color color)? childBuilder;
+  final String? badge;
   final bool modelIcon;
 
   @override
@@ -3356,20 +3426,38 @@ class _CompactIconButton extends StatelessWidget {
       // 桌面平台禁用长按
       onLongPress: isDesktop ? null : onLongPress,
       color: fgColor,
-      builder: childBuilder != null
-          ? (c) => SizedBox(
-              width: childSize,
-              height: childSize,
-              child: childBuilder!(c),
-            )
-          : (child != null
-                ? (_) => SizedBox(
-                    width: childSize,
-                    height: childSize,
-                    child: child,
-                  )
-                : null),
-      icon: child == null && childBuilder == null ? icon : null,
+      builder: childBuilder != null || child != null || badge != null
+          ? (c) {
+              final glyph = childBuilder != null
+                  ? childBuilder!(c)
+                  : child ?? Icon(icon, size: 20, color: c);
+              final iconBox = SizedBox(
+                width: childSize,
+                height: childSize,
+                child: glyph,
+              );
+              if (badge == null) return iconBox;
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  iconBox,
+                  const SizedBox(width: 3),
+                  Text(
+                    badge!,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: AppFontWeights.semibold,
+                      height: 1,
+                      color: c,
+                    ),
+                  ),
+                ],
+              );
+            }
+          : null,
+      icon: child == null && childBuilder == null && badge == null
+          ? icon
+          : null,
     );
 
     if (tooltip == null) {
@@ -3380,6 +3468,26 @@ class _CompactIconButton extends StatelessWidget {
       message: tooltip!,
       waitDuration: const Duration(milliseconds: 350),
       child: Semantics(tooltip: tooltip!, child: button),
+    );
+  }
+}
+
+// 输入栏右侧的上下文占用环：点击打开用量明细。
+class _ContextUsageInputControl extends StatelessWidget {
+  const _ContextUsageInputControl({this.onTap});
+
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final usage = context.watch<ContextUsageService?>();
+    if (usage == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: ContextUsageRing(
+        snapshot: usage.current,
+        onTap: () => onTap?.call(),
+      ),
     );
   }
 }

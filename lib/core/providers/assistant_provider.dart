@@ -101,9 +101,9 @@ class AssistantProvider extends ChangeNotifier {
     if (retiredGlobalBudget != null) {
       for (var i = 0; i < _assistants.length; i++) {
         final assistant = _assistants[i];
-        if (assistant.thinkingBudget != null) continue;
+        if (assistant.reasoning != null) continue;
         _assistants[i] = assistant.copyWith(
-          thinkingBudget: retiredGlobalBudget,
+          reasoning: Assistant.reasoningFromLegacyBudget(retiredGlobalBudget),
         );
         materializedGlobalBudget = true;
       }

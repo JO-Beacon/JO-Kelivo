@@ -1,27 +1,42 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../../../core/models/token_usage.dart';
+import '../../../core/providers/settings_provider.dart';
+import '../../../core/services/model_spec/model_spec_resolver.dart';
+import '../../../core/utils/model_cost.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 
-/// 显示详细 token 用量信息的气泡卡片。
-///
-/// 最多显示 4 行（数据为 null/0 时隐藏）：
-/// - ArrowUp：prompt token（缓存数大于 0 时显示）
-/// - ArrowDown：完成 token
-/// - Zap：tok/s（完成 token / 耗时秒数）
-/// - Timer：持续时间，单位为秒
+/// A bubble card showing detailed token usage info.
 class TokenDetailPopup extends StatelessWidget {
   const TokenDetailPopup({
     super.key,
     this.promptTokens,
     this.completionTokens,
     this.cachedTokens,
+    this.reasoningTokens,
+    this.cacheWriteTokens,
     this.durationMs,
+    this.firstTokenMs,
+    this.totalCompletionTokens,
+    this.providerId,
+    this.modelId,
   });
 
   final int? promptTokens;
   final int? completionTokens;
   final int? cachedTokens;
+  final int? reasoningTokens;
+  final int? cacheWriteTokens;
   final int? durationMs;
+  final int? firstTokenMs;
+
+  /// Output across the whole generation, matching [durationMs], even when
+  /// the token rows are configured to show only the final API request.
+  final int? totalCompletionTokens;
+  final String? providerId;
+  final String? modelId;
 
   @override
   Widget build(BuildContext context) {
@@ -29,7 +44,6 @@ class TokenDetailPopup extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final rows = <Widget>[];
 
-    // Prompt token 行
     if (promptTokens != null && promptTokens! > 0) {
       final cached = (cachedTokens ?? 0) > 0 ? cachedTokens! : 0;
       rows.add(
@@ -43,7 +57,6 @@ class TokenDetailPopup extends StatelessWidget {
       );
     }
 
-    // Completion token 行
     if (completionTokens != null && completionTokens! > 0) {
       rows.add(
         _buildRow(
@@ -54,13 +67,33 @@ class TokenDetailPopup extends StatelessWidget {
       );
     }
 
-    // tok/s 行
-    if (completionTokens != null &&
-        completionTokens! > 0 &&
+    if (reasoningTokens != null && reasoningTokens! > 0) {
+      rows.add(
+        _buildRow(
+          icon: Lucide.Brain,
+          text: l10n.tokenDetailReasoningTokens(reasoningTokens!),
+          cs: cs,
+        ),
+      );
+    }
+
+    if (cacheWriteTokens != null && cacheWriteTokens! > 0) {
+      rows.add(
+        _buildRow(
+          icon: Lucide.Database,
+          text: l10n.tokenDetailCacheWriteTokens(cacheWriteTokens!),
+          cs: cs,
+        ),
+      );
+    }
+
+    final speedTokens = totalCompletionTokens ?? completionTokens;
+    if (speedTokens != null &&
+        speedTokens > 0 &&
         durationMs != null &&
         durationMs! > 0) {
       final durationSec = durationMs! / 1000.0;
-      final tokPerSec = completionTokens! / durationSec;
+      final tokPerSec = speedTokens / durationSec;
       rows.add(
         _buildRow(
           icon: Lucide.Zap,
@@ -70,7 +103,18 @@ class TokenDetailPopup extends StatelessWidget {
       );
     }
 
-    // 持续时间行
+    if (firstTokenMs != null && firstTokenMs! >= 0) {
+      rows.add(
+        _buildRow(
+          icon: Lucide.Timer,
+          text: l10n.tokenDetailFirstToken(
+            (firstTokenMs! / 1000.0).toStringAsFixed(2),
+          ),
+          cs: cs,
+        ),
+      );
+    }
+
     if (durationMs != null && durationMs! > 0) {
       final durationSec = (durationMs! / 1000.0).toStringAsFixed(1);
       rows.add(
@@ -82,13 +126,24 @@ class TokenDetailPopup extends StatelessWidget {
       );
     }
 
+    final cost = _resolveCost(context);
+    if (cost != null) {
+      rows.add(
+        _buildRow(
+          icon: Lucide.Coins,
+          text: l10n.tokenDetailCost(formatModelCost(cost)),
+          cs: cs,
+        ),
+      );
+    }
+
     if (rows.isEmpty) return const SizedBox.shrink();
 
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 280),
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: cs.surface,
+          color: context.overlaySurface,
           borderRadius: BorderRadius.circular(10),
           boxShadow: [
             BoxShadow(
@@ -103,20 +158,45 @@ class TokenDetailPopup extends StatelessWidget {
             ),
           ],
         ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              for (int i = 0; i < rows.length; i++) ...[
-                if (i > 0) const SizedBox(height: 4),
-                rows[i],
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (int i = 0; i < rows.length; i++) ...[
+                  if (i > 0) const SizedBox(height: 4),
+                  rows[i],
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
+    );
+  }
+
+  ModelCost? _resolveCost(BuildContext context) {
+    final providerKey = providerId?.trim();
+    final modelKey = modelId?.trim();
+    if (providerKey == null ||
+        providerKey.isEmpty ||
+        modelKey == null ||
+        modelKey.isEmpty) {
+      return null;
+    }
+    final settings = context.read<SettingsProvider>();
+    return estimateModelCost(
+      TokenUsage(
+        promptTokens: promptTokens ?? 0,
+        completionTokens: completionTokens ?? 0,
+        cachedTokens: cachedTokens ?? 0,
+        cacheWriteTokens: cacheWriteTokens ?? 0,
+      ),
+      ModelSpecResolver.instance
+          .spec(settings.getProviderConfig(providerKey), modelKey)
+          .pricing,
     );
   }
 

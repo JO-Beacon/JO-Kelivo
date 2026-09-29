@@ -6839,8 +6839,8 @@ class _ModelRow extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final sp = context.watch<SettingsProvider>();
     final cfg = sp.getProviderConfig(providerKey);
-    ModelInfo infer(String id) =>
-        ModelRegistry.infer(ModelInfo(id: id, displayName: id));
+    ModelSpec infer(String id) =>
+        ModelSpecResolver.instance.spec(cfg, id, displayName: id);
     // 解析用于推理和胶囊显示的上游或 API 模型 id
     String baseId = modelId;
     final rawOv = cfg.modelOverrides[modelId];
@@ -6854,10 +6854,10 @@ class _ModelRow extends StatelessWidget {
       }
     }
 
-    ModelInfo effective() {
+    ModelSpec effective() {
       final base = infer(baseId);
       if (ov == null) return base;
-      return ModelOverrideResolver.applyModelOverride(base, ov);
+      return ModelSpecOverride.fromJson(ov).applyTo(base);
     }
 
     final info = effective();

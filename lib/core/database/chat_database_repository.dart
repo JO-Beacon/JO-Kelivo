@@ -10,6 +10,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import 'package:uuid/uuid.dart';
 
 import '../models/chat_message.dart';
+import '../models/token_usage.dart';
 import '../models/conversation.dart';
 import '../models/conversation_tree.dart';
 import '../models/message_part.dart';
@@ -3387,9 +3388,9 @@ class ChatDatabaseRepository {
         COALESCE(SUM(m.prompt_tokens), 0) AS input_tokens,
         COALESCE(SUM(m.completion_tokens), 0) AS output_tokens,
         COALESCE(SUM(m.cached_tokens), 0) AS cached_tokens,
-        COALESCE(SUM(CASE WHEN COALESCE(m.prompt_tokens, 0) = 0
-          AND COALESCE(m.completion_tokens, 0) = 0
-          THEN COALESCE(m.total_tokens, 0) ELSE 0 END), 0) AS uncategorized_tokens
+        COALESCE(SUM(MAX(COALESCE(m.total_tokens, 0)
+          - COALESCE(m.prompt_tokens, 0)
+          - COALESCE(m.completion_tokens, 0), 0)), 0) AS uncategorized_tokens
       FROM message_rows m
       WHERE m.timestamp >= ? AND m.timestamp < ?
         AND (NULLIF(TRIM(m.provider_id), '') IS NOT NULL
@@ -3407,11 +3408,17 @@ class ChatDatabaseRepository {
         .get();
 
     final modelRows = await _db.customSelect('''
-      SELECT m.model_id AS id, MIN(m.provider_id) AS provider_id,
-        COUNT(*) AS item_count
+      SELECT m.model_id AS id, NULLIF(TRIM(m.provider_id), '') AS provider_id,
+        COUNT(*) AS item_count,
+        COALESCE(SUM(m.prompt_tokens), 0) AS input_tokens,
+        COALESCE(SUM(m.completion_tokens), 0) AS output_tokens,
+        COALESCE(SUM(m.cached_tokens), 0) AS cached_tokens,
+        COALESCE(SUM(CAST(json_extract(m.extras_json, '\$."tokens.cacheWrite"')
+          AS INTEGER)), 0) AS cache_write_tokens
       FROM message_rows m
       WHERE NULLIF(TRIM(m.model_id), '') IS NOT NULL $rangeWhere
-      GROUP BY m.model_id ORDER BY item_count DESC, id;
+      GROUP BY m.model_id, NULLIF(TRIM(m.provider_id), '')
+      ORDER BY item_count DESC, id, provider_id;
     ''', variables: rangeVariables).get();
     final topicRows = await _db.customSelect('''
       SELECT c.id AS id, c.title AS label, COUNT(*) AS item_count
@@ -3466,6 +3473,10 @@ class ChatDatabaseRepository {
             label: row.read<String>('id'),
             count: row.read<int>('item_count'),
             providerId: row.readNullable<String>('provider_id'),
+            inputTokens: row.read<int>('input_tokens'),
+            outputTokens: row.read<int>('output_tokens'),
+            cachedTokens: row.read<int>('cached_tokens'),
+            cacheWriteTokens: row.read<int>('cache_write_tokens'),
           ),
       ],
       assistants: [
@@ -7434,9 +7445,24 @@ class ChatDatabaseRepository {
   }
 
   Future<void> _updateMessageRow(ChatMessage message) async {
+    final current = await (_db.select(
+      _db.messageRows,
+    )..where((t) => t.id.equals(message.id))).getSingleOrNull();
     await (_db.update(
       _db.messageRows,
-    )..where((t) => t.id.equals(message.id))).write(_messageUpdate(message));
+    )..where((t) => t.id.equals(message.id))).write(
+      _messageUpdate(message).copyWith(
+        extrasJson: Value(
+          _encodeTokenExtras(
+            current?.extrasJson ?? '{}',
+            reasoningTokens: message.reasoningTokens,
+            cacheWriteTokens: message.cacheWriteTokens,
+            finishUsage: message.finishUsage,
+            firstTokenMs: message.firstTokenMs,
+          ),
+        ),
+      ),
+    );
   }
 
   /// 部分列 UPDATE：只写入非 null 字段，因此写方修改互不相交的列时不会互相覆盖。
@@ -7457,8 +7483,10 @@ class ChatDatabaseRepository {
     int? completionTokens,
     int? cachedTokens,
     int? durationMs,
+    int? reasoningTokens,
+    int? cacheWriteTokens,
   }) {
-    final companion = MessageRowsCompanion(
+    var companion = MessageRowsCompanion(
       updatedAt: Value(DateTime.now().toUtc()),
       role: role != null ? Value(role) : const Value.absent(),
       totalTokens: totalTokens != null
@@ -7491,6 +7519,22 @@ class ChatDatabaseRepository {
       durationMs: durationMs != null ? Value(durationMs) : const Value.absent(),
     );
     return _db.transaction(() async {
+      if (reasoningTokens != null || cacheWriteTokens != null) {
+        final current = await (_db.select(
+          _db.messageRows,
+        )..where((t) => t.id.equals(messageId))).getSingleOrNull();
+        if (current != null) {
+          companion = companion.copyWith(
+            extrasJson: Value(
+              _encodeTokenExtras(
+                current.extrasJson,
+                reasoningTokens: reasoningTokens,
+                cacheWriteTokens: cacheWriteTokens,
+              ),
+            ),
+          );
+        }
+      }
       await (_db.update(
         _db.messageRows,
       )..where((t) => t.id.equals(messageId))).write(companion);
@@ -8608,6 +8652,7 @@ class ChatDatabaseRepository {
     MessageRow row, {
     List<MessagePartRow>? authoritativeParts,
   }) {
+    final extras = _decodeExtrasJson(row.extrasJson);
     final partRows = authoritativeParts ?? const <MessagePartRow>[];
     final parts = <MessagePart>[
       for (final part in partRows)
@@ -8644,6 +8689,14 @@ class ChatDatabaseRepository {
       completionTokens: row.completionTokens,
       cachedTokens: row.cachedTokens,
       durationMs: row.durationMs,
+      reasoningTokens: _tokenExtraInt(extras, _reasoningTokensExtraKey),
+      cacheWriteTokens: _tokenExtraInt(extras, _cacheWriteTokensExtraKey),
+      finishUsage: extras[_finishUsageExtraKey] is Map
+          ? TokenUsage.fromJson(
+              Map<String, dynamic>.from(extras[_finishUsageExtraKey] as Map),
+            )
+          : null,
+      firstTokenMs: _tokenExtraInt(extras, _firstTokenMsExtraKey),
     );
   }
 
@@ -8889,6 +8942,15 @@ class ChatDatabaseRepository {
       completionTokens: Value(message.completionTokens),
       cachedTokens: Value(message.cachedTokens),
       durationMs: Value(message.durationMs),
+      extrasJson: Value(
+        _encodeTokenExtras(
+          '{}',
+          reasoningTokens: message.reasoningTokens,
+          cacheWriteTokens: message.cacheWriteTokens,
+          finishUsage: message.finishUsage,
+          firstTokenMs: message.firstTokenMs,
+        ),
+      ),
       messageOrder: messageOrder,
     );
   }
@@ -8926,6 +8988,43 @@ class ChatDatabaseRepository {
     return Conversation.decodeExtras(raw);
   }
 
+  static const _reasoningTokensExtraKey = 'tokens.reasoning';
+  static const _cacheWriteTokensExtraKey = 'tokens.cacheWrite';
+  static const _finishUsageExtraKey = 'tokens.finish';
+  static const _firstTokenMsExtraKey = 'timing.firstTokenMs';
+
+  int? _tokenExtraInt(Map<String, dynamic> extras, String key) {
+    final value = extras[key];
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value);
+    return null;
+  }
+
+  /// 把 reasoning / cache-write 用量写进消息的 extras JSON，不动表结构。
+  String _encodeTokenExtras(
+    String existing, {
+    int? reasoningTokens,
+    int? cacheWriteTokens,
+    TokenUsage? finishUsage,
+    int? firstTokenMs,
+  }) {
+    final extras = Map<String, dynamic>.from(_decodeExtrasJson(existing));
+    if (reasoningTokens != null) {
+      extras[_reasoningTokensExtraKey] = reasoningTokens;
+    }
+    if (cacheWriteTokens != null) {
+      extras[_cacheWriteTokensExtraKey] = cacheWriteTokens;
+    }
+    if (finishUsage != null) {
+      extras[_finishUsageExtraKey] = finishUsage.toJson();
+    }
+    if (firstTokenMs != null) {
+      extras[_firstTokenMsExtraKey] = firstTokenMs;
+    }
+    return jsonEncode(extras);
+  }
+
   List<String> _decodeStringList(String raw) {
     try {
       final decoded = jsonDecode(raw);
@@ -8937,6 +9036,15 @@ class ChatDatabaseRepository {
   }
 
   // —— 记忆系统 V1 读取路径（§13.3）——
+
+  /// 一次事务里读出一组一致的记忆快照输入，供提示注入与用量缓存共用。
+  Future<({List<UserProfileField> profile, List<MemoryEntry> memories})>
+  readMemorySnapshotData({required String assistantId}) => _db.transaction(
+    () async => (
+      profile: await readProfileFields(),
+      memories: await queryVisibleMemories(assistantId: assistantId),
+    ),
+  );
 
   /// [assistantId] 的可见记忆：`status='active'`（除非 [includeArchived]）并且
   /// `(scope='global' OR (scope='assistant' AND assistant_id = :aid))`。当
@@ -9583,11 +9691,19 @@ final class ChatStatsRank {
     required this.label,
     required this.count,
     this.providerId,
+    this.inputTokens = 0,
+    this.outputTokens = 0,
+    this.cachedTokens = 0,
+    this.cacheWriteTokens = 0,
   });
   final String id;
   final String label;
   final int count;
   final String? providerId;
+  final int inputTokens;
+  final int outputTokens;
+  final int cachedTokens;
+  final int cacheWriteTokens;
 }
 
 final class ChatStatsAggregate {

@@ -1,5 +1,5 @@
 import '../services/auth/provider_oauth_service.dart';
-export '../models/model_types.dart';
+export '../models/model_spec.dart';
 
 import 'dart:convert';
 import 'dart:io' show HttpException;
@@ -9,175 +9,14 @@ import '../services/network/provider_http_client.dart';
 import '../services/api_key_manager.dart';
 import '../services/api/provider_request_headers.dart';
 import '../services/model_override_payload_parser.dart';
-import '../services/model_override_resolver.dart';
+import '../services/model_spec/model_spec_resolver.dart';
 import '../services/custom_request_merger.dart';
 import '../services/api/google_service_account_auth.dart';
 import '../services/api/embedding/embedding_api_service.dart';
-import '../models/model_types.dart';
-import '../utils/kimi_model_compat.dart';
-
-class ModelRegistry {
-  // 更新模型分组以反映新系列
-  // 支持视觉的模型（文本 + 图像输入）。
-  // Qwen 视觉判断是有意且精确的（见 [_isQwenVisionModel]）：并非
-  // 每个 Qwen 3.7 Max id 都是多模态。
-  static final RegExp vision = RegExp(
-    // GPT 系列，包括 4o、4.1、5（排除 gpt-5-chat）、6，以及 OpenAI o* 系列
-    r'(gpt-4o|gpt-4\.1|gpt-5(?!-chat)|gpt-6|o\d|gemini|claude|kimi-k2([-.])(?:5|6|7)|kimi-k3(?:$|[/_:@.-])|muse-spark-1(?:$|[/_:@.-])|doubao.+(?:1([-.])(?:6|8)|seed-2|seed-evolving)|grok-4|step-3|intern-s1|minimax-m3(?:$|[/_:@])|mimo-v2(?:-omni(?:$|[/_:@])|\.5(?:$|[/_:@])|\.6(?:$|[/_:@.-]))|sensenova-6\.7-flash-lite|laguna)',
-    caseSensitive: false,
-  );
-  // 可使用工具的模型
-  static final RegExp tool = RegExp(
-    (r'(gpt-4o|gpt-4\.1|gpt-oss|gpt-5(?!-chat)|gpt-6|o\d|'
-            r'gemini|claude|'
-            r'qwen-?3|doubao.+(?:1([-.])(?:6|8)|seed-2|seed-evolving)|grok-4|kimi-k2|'
-            r'kimi-k3(?:$|[/_:@.-])|muse-spark-1(?:$|[/_:@.-])|'
-            r'step-3|intern-s1|glm-4([-.])(?:5|6|7)|glm-5|minimax-(?:m2|m3)|'
-            r'deepseek-(?:r1|v3|chat|v3\.1|v3\.2|v4|flash)|'
-            r'deepseek-reasoner|'
-            r'mimo-v2|'
-            r'sensenova-6\.7-flash-lite|laguna'
-            r')')
-        .replaceAll(' ', ''),
-    caseSensitive: false,
-  );
-  static final RegExp reasoning = RegExp(
-    (r'(gpt-oss|gpt-5(?!-chat)|gpt-6|o\d|'
-            r'gemini-(?:2\.5|3).*|gemini-(?:flash-latest|pro-latest)|'
-            r'gemini-3-pro-image-preview|'
-            r'gemma[-_]?4|'
-            r'claude|'
-            r'qwen-?3|doubao.+(?:1([-.])(?:6|8)|seed-2|seed-evolving)|grok-4|kimi-k2|'
-            r'kimi-k3(?:$|[/_:@.-])|muse-spark-1(?:$|[/_:@.-])|'
-            r'step-3|intern-s1|glm-4([-.])(?:5|6|7)|glm-5|minimax-(?:m2|m3)|'
-            r'deepseek-(?:r1|v3\.1|v3\.2|v4|flash)|'
-            r'deepseek-reasoner|'
-            r'mimo-v2|laguna'
-            r')')
-        .replaceAll(' ', ''),
-    caseSensitive: false,
-  );
-
-  /// 精确的 Qwen 视觉矩阵：
-  /// - `qwen3.5*` (existing)
-  /// - `qwen3.7-plus` / `qwen3.7-flash`（+ 快照）
-  /// - 仅限 vision Max 快照 `qwen3.7-max-2026-06-08` 及之后
-  /// - `qwen3.8-max` / `qwen3.8-flash` / `qwen3.8-27b`（+ 快照）
-  /// 开放的 `qwen3.8-2.4t-a95b` 与纯文本 / 更早的 `qwen3.7-max` 保持纯文本。
-  static bool _isQwenVisionModel(String id) {
-    final lower = id.toLowerCase();
-    if (RegExp(r'qwen-?3([-.])5').hasMatch(lower)) return true;
-    if (RegExp(r'qwen-?3([-.])7-(?:plus|flash)').hasMatch(lower)) {
-      return true;
-    }
-    if (RegExp(r'qwen-?3([-.])8-(?:max|flash|27b)').hasMatch(lower)) {
-      return true;
-    }
-    final maxSnap = RegExp(
-      r'qwen-?3([-.])7-max-(\d{4}-\d{2}-\d{2})',
-    ).firstMatch(lower);
-    if (maxSnap == null) return false;
-    final date = DateTime.tryParse(maxSnap.group(2)!);
-    if (date == null) return false;
-    return !date.isBefore(DateTime(2026, 6, 8));
-  }
-
-  /// GLM-5.3-Flash 是首个原生多模态 GLM-5 SKU。
-  static bool _isGlmVisionModel(String id) {
-    return RegExp(
-      r'(^|[/_:@])glm-5\.3-flash(?:$|[-.])',
-      caseSensitive: false,
-    ).hasMatch(id);
-  }
-
-  /// DeepSeek V4.1 Flash（`deepseek-flash`）为原生多模态。
-  /// 已下线的 Flash 旧 id 会临时路由到它并继承图片输入能力。
-  /// 在对应 SKU 下线前，`deepseek-v4-pro` 仍只支持文本。
-  static bool _isDeepSeekVisionModel(String id) {
-    return RegExp(
-      r'(^|[/_:@])(?:deepseek-flash|deepseek-v4-flash)(?:$|[/_:@.-])',
-      caseSensitive: false,
-    ).hasMatch(id);
-  }
-
-  static bool isLikelyEmbeddingId(String rawId) {
-    final id = rawId.toLowerCase();
-    return id.contains('embedding') ||
-        RegExp(r'(^|[-_/])embed(?:dings?)?([-.]|$)').hasMatch(id);
-  }
-
-  static bool _isGemini35Flash(String id) {
-    return RegExp(
-      r'(^|[/:_-])gemini-3\.5-flash([._:@/-]|$)',
-      caseSensitive: false,
-    ).hasMatch(id);
-  }
-
-  static ModelInfo infer(ModelInfo base) {
-    final id = base.id.toLowerCase();
-    // Kimi Code 的短别名（k3／k3-256k）与 kimi-for-coding、kimi-k2.8
-    // 不体现在名称里，需要单独识别，否则会漏掉视觉、工具与思考能力。
-    final isKimiCode =
-        isKimiCodeK3Alias(id) || isKimiForCodingModel(id) || isKimiK28Model(id);
-    final inMods = <Modality>[...base.input];
-    final outMods = <Modality>[...base.output];
-    final ab = <ModelAbility>[...base.abilities];
-    final bool inferEmbeddingById = isLikelyEmbeddingId(id);
-    if (base.type == ModelType.embedding || inferEmbeddingById) {
-      if (!inMods.contains(Modality.text)) inMods.add(Modality.text);
-      outMods
-        ..clear()
-        ..add(Modality.text);
-      ab.clear();
-      return base.copyWith(
-        type: ModelType.embedding,
-        input: inMods,
-        output: outMods,
-        abilities: ab,
-      );
-    }
-    // 如果模型 id 包含 'image'，则将其视为图像模型：
-    // - 输入和输出都包含图像
-    // - 不具备工具或推理能力
-    if (id.contains('image')) {
-      if (!inMods.contains(Modality.image)) inMods.add(Modality.image);
-      if (!outMods.contains(Modality.image)) outMods.add(Modality.image);
-      ab.removeWhere(
-        (x) => x == ModelAbility.tool || x == ModelAbility.reasoning,
-      );
-      return base.copyWith(input: inMods, output: outMods, abilities: ab);
-    }
-    if (_isGemini35Flash(id)) {
-      if (!inMods.contains(Modality.image)) inMods.add(Modality.image);
-      outMods
-        ..clear()
-        ..add(Modality.text);
-      if (!ab.contains(ModelAbility.tool)) ab.add(ModelAbility.tool);
-      if (!ab.contains(ModelAbility.reasoning)) {
-        ab.add(ModelAbility.reasoning);
-      }
-      return base.copyWith(input: inMods, output: outMods, abilities: ab);
-    }
-    if (vision.hasMatch(id) ||
-        isKimiCode ||
-        _isQwenVisionModel(id) ||
-        _isGlmVisionModel(id) ||
-        _isDeepSeekVisionModel(id)) {
-      if (!inMods.contains(Modality.image)) inMods.add(Modality.image);
-    }
-    if ((tool.hasMatch(id) || isKimiCode) && !ab.contains(ModelAbility.tool)) {
-      ab.add(ModelAbility.tool);
-    }
-    if ((reasoning.hasMatch(id) || isKimiCode) &&
-        !ab.contains(ModelAbility.reasoning)) {
-      ab.add(ModelAbility.reasoning);
-    }
-    return base.copyWith(input: inMods, output: outMods, abilities: ab);
-  }
-}
+import '../models/model_spec.dart';
 
 abstract class BaseProvider {
-  Future<List<ModelInfo>> listModels(ProviderConfig cfg);
+  Future<List<ModelSpec>> listModels(ProviderConfig cfg);
 }
 
 class _Http {
@@ -233,7 +72,7 @@ Uri _modelListUri(ProviderConfig cfg, {required bool anthropic}) {
 
 class OpenAIProvider extends BaseProvider {
   @override
-  Future<List<ModelInfo>> listModels(ProviderConfig cfg) async {
+  Future<List<ModelSpec>> listModels(ProviderConfig cfg) async {
     final key = ProviderManager._effectiveApiKey(cfg);
     final client = providerHttpClient(cfg);
     try {
@@ -249,12 +88,13 @@ class OpenAIProvider extends BaseProvider {
         return [
           for (final e in data)
             if (e is Map && e['id'] is String)
-              ModelRegistry.infer(
-                ModelInfo(
-                  id: e['id'] as String,
-                  displayName: e['id'] as String,
-                ),
-              ),
+              ModelSpecResolver.instance
+                  .resolve(
+                    cfg,
+                    e['id'] as String,
+                    displayName: e['id'] as String,
+                  )
+                  .spec,
         ];
       }
       _throwForNon2xx(res);
@@ -267,7 +107,7 @@ class OpenAIProvider extends BaseProvider {
 class ClaudeProvider extends BaseProvider {
   static const String anthropicVersion = '2023-06-01';
   @override
-  Future<List<ModelInfo>> listModels(ProviderConfig cfg) async {
+  Future<List<ModelSpec>> listModels(ProviderConfig cfg) async {
     final key = ProviderManager._effectiveApiKey(cfg);
     final client = providerHttpClient(cfg);
     try {
@@ -290,13 +130,14 @@ class ClaudeProvider extends BaseProvider {
         return [
           for (final e in data)
             if (e is Map && e['id'] is String)
-              ModelRegistry.infer(
-                ModelInfo(
-                  id: e['id'] as String,
-                  displayName:
-                      (e['display_name'] as String?) ?? (e['id'] as String),
-                ),
-              ),
+              ModelSpecResolver.instance
+                  .resolve(
+                    cfg,
+                    e['id'] as String,
+                    displayName:
+                        (e['display_name'] as String?) ?? (e['id'] as String),
+                  )
+                  .spec,
         ];
       }
       _throwForNon2xx(res);
@@ -322,7 +163,7 @@ class GoogleProvider extends BaseProvider {
   }
 
   @override
-  Future<List<ModelInfo>> listModels(ProviderConfig cfg) async {
+  Future<List<ModelSpec>> listModels(ProviderConfig cfg) async {
     final client = providerHttpClient(cfg);
     try {
       final url = _buildUrl(cfg);
@@ -351,7 +192,7 @@ class GoogleProvider extends BaseProvider {
           headers['x-goog-api-key'] = key;
         }
       }
-      final out = <ModelInfo>[];
+      final out = <ModelSpec>[];
       final res = await client.get(
         Uri.parse(url),
         headers: _Http.modelListHeaders(cfg, headers),
@@ -378,15 +219,9 @@ class GoogleProvider extends BaseProvider {
             continue;
           }
           out.add(
-            ModelRegistry.infer(
-              ModelInfo(
-                id: id,
-                displayName: displayName,
-                type: methods.contains('generateContent')
-                    ? ModelType.chat
-                    : ModelType.embedding,
-              ),
-            ),
+            ModelSpecResolver.instance
+                .resolve(cfg, id, displayName: displayName)
+                .spec,
           );
         }
       }
@@ -419,7 +254,9 @@ class GoogleProvider extends BaseProvider {
         ];
         for (final id in knownClaude) {
           if (!out.any((m) => m.id == id)) {
-            out.add(ModelRegistry.infer(ModelInfo(id: id, displayName: id)));
+            out.add(
+              ModelSpecResolver.instance.resolve(cfg, id, displayName: id).spec,
+            );
           }
         }
       }
@@ -489,7 +326,7 @@ class ProviderManager {
     }
   }
 
-  static Future<List<ModelInfo>> listModels(ProviderConfig cfg) {
+  static Future<List<ModelSpec>> listModels(ProviderConfig cfg) {
     // 账号登录的供应商由登录服务负责取模型目录。
     if (cfg.isOAuth) return ProviderOAuthService.instance.models(cfg);
     return forConfig(cfg).listModels(cfg);
@@ -503,8 +340,8 @@ class ProviderManager {
     // 向量模型没有聊天接口，连接测试改走供应商的 embeddings 端点。
     final embeddingOverride = _modelOverride(cfg, modelId);
     final modelType =
-        ModelOverrideResolver.parseModelTypeOverride(embeddingOverride) ??
-        ModelRegistry.infer(ModelInfo(id: modelId, displayName: modelId)).type;
+        ModelSpecOverride.fromJson(embeddingOverride).type ??
+        ModelSpecResolver.instance.spec(cfg, modelId).type;
     if (modelType == ModelType.embedding) {
       await EmbeddingApiService.embed(
         config: cfg,
@@ -680,9 +517,10 @@ class ProviderManager {
               .toList();
           wantsImageOutput = outList.contains('image');
         } else {
-          wantsImageOutput = ModelRegistry.infer(
-            ModelInfo(id: upstreamId, displayName: upstreamId),
-          ).output.contains(Modality.image);
+          wantsImageOutput = ModelSpecResolver.instance
+              .spec(cfg, upstreamId)
+              .output
+              .contains(Modality.image);
         }
         final Map<String, dynamic> body = isVertexClaude
             ? <String, dynamic>{

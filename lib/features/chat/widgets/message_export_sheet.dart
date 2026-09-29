@@ -21,7 +21,6 @@ import '../../../core/models/chat_message.dart';
 import '../../../core/models/message_part.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/providers/settings_provider.dart';
-import '../../../core/providers/model_provider.dart';
 import '../../../core/providers/user_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/models/assistant.dart';
@@ -80,10 +79,7 @@ String? _modelDisplayNameFromSettings(
     }
   }
 
-  final inferred = ModelRegistry.infer(
-    ModelInfo(id: baseId, displayName: baseId),
-  );
-  final fallback = inferred.displayName.trim();
+  final fallback = baseId.trim();
   return name ?? (fallback.isNotEmpty ? fallback : baseId);
 }
 

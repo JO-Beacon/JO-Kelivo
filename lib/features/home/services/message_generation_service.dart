@@ -1,4 +1,12 @@
+import '../../../core/models/model_spec.dart';
+import 'context_usage_service.dart';
+import '../../../core/providers/world_book_provider.dart';
+import '../../../core/providers/instruction_injection_provider.dart';
+import '../../../core/providers/assistant_provider.dart';
+import '../../../core/services/mcp/mcp_tool_service.dart';
+import 'context_assembly.dart';
 import 'package:Kelivo/core/providers/external_mounts_provider.dart';
+import '../../../core/models/reasoning_request.dart';
 import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
@@ -66,6 +74,8 @@ class PreparedGeneration {
   final ToolCallHandler? onToolCall;
   final bool hasBuiltInSearch;
   final List<String> lastUserImagePaths;
+  final Object? contextUsageConfiguration;
+  final int? contextUsageRevision;
 
   PreparedGeneration({
     required this.apiMessages,
@@ -73,7 +83,31 @@ class PreparedGeneration {
     this.onToolCall,
     required this.hasBuiltInSearch,
     required this.lastUserImagePaths,
+    this.contextUsageConfiguration,
+    this.contextUsageRevision,
   });
+}
+
+/// 装配结果：系统提示、注入、历史、工具定义已就位，但尚未做 OCR、
+/// 文档抽取与内联图片编码。
+class UnprocessedRequestContext {
+  UnprocessedRequestContext({
+    required this.apiMessages,
+    required this.toolDefs,
+    required this.hasBuiltInSearch,
+    required this.workspaceContext,
+    required this.mcpRouteSnapshot,
+    required this.workspaceAttachments,
+    required this.cfg,
+  });
+
+  final List<Map<String, dynamic>> apiMessages;
+  final List<Map<String, dynamic>> toolDefs;
+  final bool hasBuiltInSearch;
+  final WorkspaceToolContext? workspaceContext;
+  final McpToolRouteSnapshot? mcpRouteSnapshot;
+  final List<AttachmentInfo> workspaceAttachments;
+  final ProviderConfig cfg;
 }
 
 /// 负责消息生成编排的服务。
@@ -115,27 +149,31 @@ class MessageGenerationService {
   void Function(String? messageId)? onFileProcessingFinished;
 
   /// 检查给定预算下是否启用推理
-  bool isReasoningEnabled(int? budget) {
-    if (budget == null) return true;
-    if (budget == -1) return true;
-    return budget >= 1024;
+  bool isReasoningEnabled(ReasoningRequest r) {
+    return r.level != ReasoningLevel.off;
   }
 
   /// 准备应用所有注入后的 API 消息。
   /// [requiredAttachmentMessageId] 标识一次新的提交；重试与历史上下文
   /// 合法地引用已被移除的附件。
-  Future<PreparedGeneration> prepareApiMessagesWithInjections({
+  /// 打包系统提示、注入、历史与工具定义，不做 OCR、文档抽取和内联
+  /// 图片编码；预览用量时复用同一条路径。
+  ///
+  /// [versionSelections] 为上游并行版本选择模型保留：本仓库活动分支已由
+  /// 消息树表达，这里不参与装配。
+  Future<UnprocessedRequestContext> assembleUnprocessedRequestContext({
     required List<ChatMessage> messages,
+    required Map<String, int> versionSelections,
     required Conversation? currentConversation,
     required SettingsProvider settings,
     required Assistant? assistant,
     required String? assistantId,
     required String providerKey,
     required String modelId,
-    ToolApprovalService? approvalService,
-    AskUserInteractionService? askUserService,
-    String? processingMessageId,
     String? requiredAttachmentMessageId,
+    bool syncWorkspaceAttachments = true,
+    bool persistWorldBookActivation = true,
+    void Function(int before, int after)? onWorldBookActivationPersisted,
   }) async {
     final cfg = settings.getProviderConfig(providerKey);
     final kind = ProviderConfig.classify(
@@ -220,6 +258,8 @@ class MessageGenerationService {
       assistantId,
       conversation: promptConversation,
       conversationScoped: assistant?.allowConversationPromptInjection ?? false,
+      persistActivation: persistWorldBookActivation,
+      onActivationPersisted: onWorldBookActivationPersisted,
       // 本仓库的 messages 已经是活动分支（真树模型），
       // 不需要再按 groupId／version 折叠。
       sourceMessages: messages,
@@ -241,7 +281,9 @@ class MessageGenerationService {
         assistant: assistant,
         conversation: currentConversation,
       );
-      if (workspaceContext != null && !workspaceContext.skillsOnly) {
+      if (syncWorkspaceAttachments &&
+          workspaceContext != null &&
+          !workspaceContext.skillsOnly) {
         workspaceAttachments = await syncAttachments(
           workspaceContext,
           messages,
@@ -290,6 +332,141 @@ class MessageGenerationService {
       workspaceContext: workspaceContext,
       conversationId: currentConversation?.id,
     );
+    return UnprocessedRequestContext(
+      apiMessages: apiMessages,
+      toolDefs: toolDefs,
+      hasBuiltInSearch: hasBuiltInSearch,
+      workspaceContext: workspaceContext,
+      mcpRouteSnapshot: mcpRouteSnapshot,
+      workspaceAttachments: workspaceAttachments,
+      cfg: cfg,
+    );
+  }
+
+  /// 无副作用地跑一遍装配，供后台估算上下文用量。
+  Future<ContextAssemblyPreview> previewContextAssembly({
+    required String conversationId,
+    required String providerKey,
+    required String modelId,
+    required String? assistantId,
+  }) async {
+    final settings = contextProvider.read<SettingsProvider>();
+    Assistant? assistant;
+    try {
+      final assistants = contextProvider.read<AssistantProvider>();
+      assistant = assistantId == null ? null : assistants.getById(assistantId);
+    } catch (_) {}
+    final conversation = chatService.getConversation(conversationId);
+    final messages = await chatService.loadMessages(conversationId);
+    final packed = await assembleUnprocessedRequestContext(
+      messages: messages,
+      versionSelections: chatService.getVersionSelections(conversationId),
+      currentConversation: conversation,
+      settings: settings,
+      assistant: assistant,
+      assistantId: assistantId,
+      providerKey: providerKey,
+      modelId: modelId,
+      syncWorkspaceAttachments: false,
+      persistWorldBookActivation: false,
+    );
+    // 复用发送链路带出实时记忆快照与冻结的用户提示词；预览不得冻结草稿、
+    // 跑 OCR 或写 extras。
+    await messageBuilderService.processUserMessagesForApi(
+      packed.apiMessages,
+      settings,
+      assistant,
+      conversation: conversation,
+      sourceMessages: messages,
+      previewOnly: true,
+    );
+    return ContextAssemblyPreview.fromApiMessages(
+      apiMessages: packed.apiMessages,
+      mcpToolNames: {
+        for (final tool in packed.toolDefs)
+          if (tool['function'] case {'name': final String name})
+            if (packed.mcpRouteSnapshot?.containsExposedName(name) ?? false)
+              name,
+      },
+      tools: packed.toolDefs,
+      images: imageRefsFromApiMessages(
+        packed.apiMessages,
+        sourceMessages: messages,
+      ),
+    );
+  }
+
+
+  Future<PreparedGeneration> prepareApiMessagesWithInjections({
+    required List<ChatMessage> messages,
+    required Conversation? currentConversation,
+    required SettingsProvider settings,
+    required Assistant? assistant,
+    required String? assistantId,
+    required String providerKey,
+    required String modelId,
+    ToolApprovalService? approvalService,
+    AskUserInteractionService? askUserService,
+    String? processingMessageId,
+    String? requiredAttachmentMessageId,
+    Map<String, int>? versionSelections,
+  }) async {
+    final instructions = contextProvider.read<InstructionInjectionProvider?>();
+    final worldBooks = contextProvider.read<WorldBookProvider?>();
+    await instructions?.initialize();
+    await worldBooks?.initialize();
+    // 装配前取修订号；如果装配自己写了世界书激活，只接受那一次写入。
+    var requestRevision = currentConversation == null
+        ? null
+        : chatService.contextRevision(currentConversation.id);
+    final packed = await assembleUnprocessedRequestContext(
+      messages: messages,
+      versionSelections:
+          versionSelections ??
+          chatService.getVersionSelections(currentConversation?.id ?? ''),
+      currentConversation: currentConversation,
+      settings: settings,
+      assistant: assistant,
+      assistantId: assistantId,
+      providerKey: providerKey,
+      modelId: modelId,
+      requiredAttachmentMessageId: requiredAttachmentMessageId,
+      onWorldBookActivationPersisted: (before, after) {
+        requestRevision = requestRevision == before && after == before + 1
+            ? after
+            : null;
+      },
+    );
+    final configuration = contextUsageConfiguration(
+      settings: settings,
+      config: settings.getProviderConfig(providerKey),
+      providerKey: providerKey,
+      modelId: modelId,
+      assistant: assistant,
+      assistantId: assistantId,
+      instructions: instructions,
+      worldBooks: worldBooks,
+      conversation: currentConversation == null
+          ? null
+          : chatService.getConversation(currentConversation.id) ??
+                currentConversation,
+    );
+    final requestConfiguration = (
+      settings: configuration.settings,
+      memorySnapshotHash: await readContextMemorySnapshotHash(
+        repository: chatService.chatRepositoryOrNull,
+        settings: settings,
+        assistant: assistant,
+      ),
+    );
+    final apiMessages = packed.apiMessages;
+    final toolDefs = packed.toolDefs;
+    final hasBuiltInSearch = packed.hasBuiltInSearch;
+    final workspaceContext = packed.workspaceContext;
+    final mcpRouteSnapshot = packed.mcpRouteSnapshot;
+    final workspaceAttachments = packed.workspaceAttachments;
+    final cfg = packed.cfg;
+
     final sandboxDataFiles = BuiltInToolsHelper.sendsDataFilesToSandbox(
       cfg: cfg,
       modelId: modelId,
@@ -301,7 +478,7 @@ class MessageGenerationService {
         toolDefs.any((tool) {
           final name = (tool['function'] as Map?)?['name'];
           return (name == 'read_file' || name == 'shell') &&
-              workspaceContext!.workspace.isToolEnabled(name as String);
+              workspaceContext.workspace.isToolEnabled(name as String);
         });
     final localAttachments = <String, AttachmentInfo>{
       if (hasWorkspaceFileTools)
@@ -380,6 +557,8 @@ class MessageGenerationService {
       onToolCall: onToolCall,
       hasBuiltInSearch: hasBuiltInSearch,
       lastUserImagePaths: lastUserImagePaths,
+      contextUsageConfiguration: requestConfiguration,
+      contextUsageRevision: requestRevision,
     );
   }
 
@@ -611,6 +790,8 @@ class MessageGenerationService {
       scheduled: scheduled,
       scheduledNotify: scheduledNotify,
       scheduledPreview: scheduledPreview,
+      contextUsageConfiguration: prepared.contextUsageConfiguration,
+      contextUsageRevision: prepared.contextUsageRevision,
     );
   }
 

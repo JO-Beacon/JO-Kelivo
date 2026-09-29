@@ -1,4 +1,4 @@
-import '../../../core/models/model_types.dart';
+import '../../../core/models/model_spec.dart';
 
 /// 目录同步得到的账号元数据不在模型表单中编辑；保存时从最新覆盖项读取，
 /// 这样编辑期间发生的目录刷新也不会被旧表单覆盖。

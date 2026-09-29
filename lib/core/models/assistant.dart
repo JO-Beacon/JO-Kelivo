@@ -50,35 +50,15 @@ class Assistant {
   final bool streamOutput; // 是否使用流式响应
   final ReasoningRequest? reasoning; // null = 无助手默认档位
 
-  /// 兼容旧调用点的临时垫片：由 [reasoning] 折算回旧的整数预算。
-  /// S5 将调用点改到 [reasoning] 后删除。
-  int? get thinkingBudget {
-    final r = reasoning;
-    if (r == null) return null;
-    if (r.budgetTokens != null) return r.budgetTokens;
-    return switch (r.level) {
-      ReasoningLevel.off => 0,
-      ReasoningLevel.auto => -1,
-      _ => null,
-    };
-  }
-
-  static ReasoningRequest? _reasoningFromLegacyBudget(int? budget) {
-    if (budget == null) return null;
+  /// 旧数据兼容：把整数思考预算换算成显式档位。
+  ///
+  /// `0` 表示关闭，负数表示自动，正整数作为显式 token 预算保留。
+  static ReasoningRequest reasoningFromLegacyBudget(int budget) {
     if (budget == 0) return ReasoningRequest.off;
     if (budget < 0) return ReasoningRequest.auto;
-    // 与旧 openAIEffortForBudget 的阀值一致，保留 xhigh / max 区分。
-    final level = budget >= 128000
-        ? ReasoningLevel.max
-        : budget >= 64000
-        ? ReasoningLevel.xhigh
-        : budget <= 2000
-        ? ReasoningLevel.low
-        : budget <= 20000
-        ? ReasoningLevel.medium
-        : ReasoningLevel.high;
-    return ReasoningRequest(level, budgetTokens: budget);
+    return ReasoningRequest(ReasoningLevel.auto, budgetTokens: budget);
   }
+
   final int? maxTokens; // null = 不限制
   final String systemPrompt;
 
@@ -199,7 +179,6 @@ class Assistant {
     bool? limitContextMessages,
     bool? streamOutput,
     ReasoningRequest? reasoning,
-    int? thinkingBudget,
     int? maxTokens,
     String? systemPrompt,
     bool? allowConversationSystemPrompt,
@@ -240,7 +219,6 @@ class Assistant {
     bool clearTemperature = false,
     bool clearTopP = false,
     bool clearReasoning = false,
-    bool clearThinkingBudget = false,
     bool clearMaxTokens = false,
     bool clearBackground = false,
   }) {
@@ -262,13 +240,7 @@ class Assistant {
       contextMessageSize: contextMessageSize ?? this.contextMessageSize,
       limitContextMessages: limitContextMessages ?? this.limitContextMessages,
       streamOutput: streamOutput ?? this.streamOutput,
-      reasoning: clearReasoning
-          ? null
-          : (clearThinkingBudget
-                ? null
-                : (reasoning ??
-                      _reasoningFromLegacyBudget(thinkingBudget) ??
-                      this.reasoning)),
+      reasoning: clearReasoning ? null : (reasoning ?? this.reasoning),
       maxTokens: clearMaxTokens ? null : (maxTokens ?? this.maxTokens),
       systemPrompt: systemPrompt ?? this.systemPrompt,
       allowConversationSystemPrompt:
@@ -381,12 +353,7 @@ class Assistant {
   static ReasoningRequest? _readReasoning(Object? value) {
     if (value is Map) return ReasoningRequest.fromJson(value);
     // 老数据兼容：旧字段 thinkingBudget 是整数预算。
-    if (value is num) {
-      final budget = value.toInt();
-      if (budget == 0) return ReasoningRequest.off;
-      if (budget < 0) return ReasoningRequest.auto;
-      return ReasoningRequest(ReasoningLevel.auto, budgetTokens: budget);
-    }
+    if (value is num) return reasoningFromLegacyBudget(value.toInt());
     return null;
   }
 

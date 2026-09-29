@@ -6,6 +6,7 @@ import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import 'context_usage_header.dart';
 
 /// 移动端底部面板：压缩上下文或清空上下文。
 class ContextManagementSheet extends StatelessWidget {
@@ -15,6 +16,8 @@ class ContextManagementSheet extends StatelessWidget {
     this.onClear,
     this.clearLabel,
     this.messageCountLabel,
+    this.conversationId,
+    this.draftText = '',
   });
 
   final VoidCallback? onCompress;
@@ -23,6 +26,8 @@ class ContextManagementSheet extends StatelessWidget {
 
   /// 当前上下文中的消息条数，例如“12 条消息”，显示在屏蔽那一行的右侧。
   final String? messageCountLabel;
+  final String? conversationId;
+  final String draftText;
 
   @override
   Widget build(BuildContext context) {
@@ -59,27 +64,41 @@ class ContextManagementSheet extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          _OptionRow(
-            icon: Lucide.package2,
-            label: l10n.compressContext,
-            description: l10n.compressContextDesc,
-            onTap: () {
-              Haptics.light();
-              onCompress?.call();
-            },
+          Flexible(
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ContextUsageHeader(
+                    conversationId: conversationId,
+                    draftText: draftText,
+                  ),
+                  const SizedBox(height: 16),
+                  _OptionRow(
+                    icon: Lucide.package2,
+                    label: l10n.compressContext,
+                    description: l10n.compressContextDesc,
+                    onTap: () {
+                      Haptics.light();
+                      onCompress?.call();
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  _OptionRow(
+                    icon: Lucide.Eraser,
+                    label: clearLabel ?? l10n.bottomToolsSheetClearContext,
+                    description: l10n.clearContextDesc,
+                    trailing: messageCountLabel,
+                    onTap: () {
+                      Haptics.light();
+                      onClear?.call();
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                ],
+              ),
+            ),
           ),
-          const SizedBox(height: 8),
-          _OptionRow(
-            icon: Lucide.Eraser,
-            label: clearLabel ?? l10n.bottomToolsSheetClearContext,
-            description: l10n.clearContextDesc,
-            trailing: messageCountLabel,
-            onTap: () {
-              Haptics.light();
-              onClear?.call();
-            },
-          ),
-          const SizedBox(height: 8),
         ],
       ),
     );

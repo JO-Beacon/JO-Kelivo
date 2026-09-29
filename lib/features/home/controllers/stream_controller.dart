@@ -1646,6 +1646,8 @@ class GenerationContext {
     this.scheduled = false,
     this.scheduledNotify = true,
     this.scheduledPreview = true,
+    this.contextUsageConfiguration,
+    this.contextUsageRevision,
   });
 
   final ChatMessage assistantMessage;
@@ -1669,12 +1671,17 @@ class GenerationContext {
   final String? generationRunId;
   final bool scheduled;
   final bool scheduledNotify, scheduledPreview;
+  final Object? contextUsageConfiguration;
+  final int? contextUsageRevision;
 }
 
 /// 流式消息生成的状态对象。
 class StreamingState {
   StreamingState(this.ctx)
     : _content = StreamTextBuffer(ctx.assistantMessage.content),
+      totalTokens = ctx.assistantMessage.totalTokens ?? 0,
+      firstTokenMs = ctx.assistantMessage.firstTokenMs,
+      _previousUsage = ctx.assistantMessage.tokenUsage,
       partsHandler = StreamChunkHandler(seed: ctx.assistantMessage.parts);
 
   final GenerationContext ctx;
@@ -1683,8 +1690,19 @@ class StreamingState {
   set fullContentRaw(String text) => _content.value = text;
   bool get hasContent => !_content.isEmpty;
   void appendContent(String delta) => _content.add(delta);
-  int totalTokens = 0;
+  int totalTokens;
   TokenUsage? usage;
+  final TokenUsage _previousUsage;
+
+  /// 本轮所有 API 请求的合计（含此前已持久化的部分）。
+  TokenUsage? get totalUsage {
+    final current = partsHandler.totalUsage ?? usage;
+    // 回答工具追问时会复用同一条持久化消息。
+    return _previousUsage.hasReportedTokens
+        ? _previousUsage + (current ?? const TokenUsage())
+        : current;
+  }
+
   final StreamTextBuffer _bufferedReasoning = StreamTextBuffer();
   String get bufferedReasoning => _bufferedReasoning.value;
   set bufferedReasoning(String text) => _bufferedReasoning.value = text;
@@ -1693,7 +1711,49 @@ class StreamingState {
   bool finishHandled = false;
   bool terminalPersisted = false;
   bool titleQueued = false;
-  DateTime? streamStartedAt;
+  DateTime? requestStartedAt;
+  DateTime? requestFinishedAt;
+  int? firstTokenMs;
+
+  /// 整轮生成耗时（含等待与思考）。工具回答会续写同一条消息，
+  /// 因此要把前几轮的时间累加。
+  int? get durationMs {
+    final previous = ctx.assistantMessage.durationMs;
+    final elapsed = _requestElapsedMs(requestFinishedAt ?? DateTime.now());
+    return elapsed == null ? previous : (previous ?? 0) + elapsed;
+  }
+
+  int? _requestElapsedMs(DateTime end) {
+    final start = requestStartedAt;
+    if (start == null) return null;
+    final elapsed = end.difference(start).inMilliseconds;
+    // 设备时钟回拨不得写入负耗时。
+    return elapsed < 0 ? null : elapsed;
+  }
+
+  /// 记录「首个真正的输出」出现的时间（文本、思考、工具入参或图片）。
+  void recordFirstOutput(StreamChunk chunk) {
+    if (firstTokenMs != null ||
+        requestFinishedAt != null ||
+        ctx.assistantMessage.durationMs != null) {
+      return;
+    }
+    final hasOutput = switch (chunk) {
+      TextDelta(:final text) || ReasoningDelta(:final text) => text.isNotEmpty,
+      ToolCallStart(:final toolName) ||
+      ServerToolStart(:final toolName) => toolName.isNotEmpty,
+      ToolCallDelta(:final toolNameDelta, :final inputDelta) =>
+        toolNameDelta.isNotEmpty || inputDelta.isNotEmpty,
+      ServerToolInputDelta(:final inputDelta) => inputDelta.isNotEmpty,
+      ImageDelta(:final data) || ImageSnapshot(:final data) => data.isNotEmpty,
+      GeneratedFile(:final uri) => uri.isNotEmpty,
+      _ => false,
+    };
+    if (hasOutput) firstTokenMs = _requestElapsedMs(DateTime.now());
+  }
+
+  /// 在 UI 排空、持久化或取消清理之前冻结计时。
+  void finishRequestTiming() => requestFinishedAt ??= DateTime.now();
   int? generationStateRevision;
   bool generationStreamingStarted = false;
   final Map<String, String> pendingToolNames = <String, String>{};

@@ -8,6 +8,7 @@ import 'package:Kelivo/core/services/api/builtin_tools.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
 
 import 'support/collect_generation.dart';
+import 'support/legacy_reasoning.dart';
 
 ProviderConfig _deepSeekConfig(
   String baseUrl, {
@@ -195,7 +196,7 @@ void main() {
         messages: const [
           {'role': 'user', 'content': '9.11 and 9.8, which is greater?'},
         ],
-        thinkingBudget: 2000,
+        reasoning: legacyBudget(2000),
         stream: false,
       ).toList();
 
@@ -293,7 +294,7 @@ void main() {
         messages: const [
           {'role': 'user', 'content': 'hello'},
         ],
-        thinkingBudget: 0,
+        reasoning: legacyBudget(0),
         stream: false,
       ).toList();
 
@@ -302,7 +303,7 @@ void main() {
     });
 
     test(
-      'xhigh reasoning keeps thinking enabled and is sent as xhigh',
+      'very high budget clamps to the model highest supported effort',
       () async {
         final requests = <Map<String, dynamic>>[];
 
@@ -345,13 +346,13 @@ void main() {
           messages: const [
             {'role': 'user', 'content': 'hello'},
           ],
-          thinkingBudget: 64000,
+          reasoning: legacyBudget(64000),
         ).toList();
 
         expect(chunks.isGenerationDone, isTrue);
         expect(requests, hasLength(1));
         expect(requests.single['thinking'], {'type': 'enabled'});
-        expect(requests.single['reasoning_effort'], 'xhigh');
+        expect(requests.single['reasoning_effort'], 'high');
       },
     );
 
@@ -397,7 +398,7 @@ void main() {
         messages: const [
           {'role': 'user', 'content': 'hello'},
         ],
-        thinkingBudget: 0,
+        reasoning: legacyBudget(0),
       ).toList();
 
       expect(chunks.isGenerationDone, isTrue);

@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../../core/services/model_spec/model_spec_resolver.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -20,7 +21,6 @@ import '../../../shared/widgets/model_tag_wrap.dart';
 import '../../../desktop/desktop_home_page.dart' show DesktopHomePage;
 import '../../provider/widgets/provider_avatar.dart';
 import '../../provider/widgets/provider_balance_badge.dart';
-import '../../../core/services/model_override_resolver.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../home/controllers/home_page_controller.dart';
 import '../../home/utils/model_display_helper.dart';
@@ -95,10 +95,7 @@ List<String> _buildDisplayProvidersOrder(
 
 // 供 compute 使用的静态函数，必须是顶层函数
 _ModelProcessingResult _processModelsInBackground(_ModelProcessingData data) {
-  if (data.disableResolverPlatformLogging) {
-    ModelOverrideResolver.setPlatformLoggingEnabled(false);
-    ModelOverrideResolver.setUnknownValueLoggingEnabled(false);
-  }
+  if (data.disableResolverPlatformLogging) {}
   final providers = data.limitProviderKey == null
       ? data.providerConfigs
       : {
@@ -137,15 +134,14 @@ _ModelProcessingResult _processModelsInBackground(_ModelProcessingData data) {
                 .trim();
             if (raw != null && raw.isNotEmpty) baseId = raw;
           }
-          ModelInfo base = ModelRegistry.infer(
-            ModelInfo(id: baseId, displayName: baseId),
+          ModelSpec base = ModelSpecResolver.instance.specFromId(
+            baseId,
+            displayName: baseId,
           );
           if (ov != null) {
-            base = ModelOverrideResolver.applyModelOverride(
-              base,
+            base = ModelSpecOverride.fromJson(
               ov,
-              applyDisplayName: true,
-            );
+            ).applyTo(base, applyDisplayName: true);
           }
           return _ModelItem(
             providerKey: key,
@@ -179,7 +175,7 @@ _ModelProcessingResult _processModelsInBackground(_ModelProcessingData data) {
         providerKey: pk,
         providerName: g.name,
         id: mid,
-        info: ModelRegistry.infer(ModelInfo(id: mid, displayName: mid)),
+        info: ModelSpecResolver.instance.specFromId(mid, displayName: mid),
         pinned: true,
         selected: data.currentModelKey == '$pk::$mid',
       ),
@@ -1063,7 +1059,10 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
               providerKey: pk,
               providerName: g.name,
               id: mid,
-              info: ModelRegistry.infer(ModelInfo(id: mid, displayName: mid)),
+              info: ModelSpecResolver.instance.specFromId(
+                mid,
+                displayName: mid,
+              ),
               pinned: true,
               selected: false,
             ),
@@ -1698,7 +1697,7 @@ class _ModelItem {
   final String providerKey;
   final String providerName;
   final String id;
-  final ModelInfo info;
+  final ModelSpec info;
   final bool pinned;
   final bool selected;
   final String? asset; // 为性能预先解析的头像资源
@@ -2113,7 +2112,10 @@ class _DesktopModelSelectDialogBodyState
               providerKey: pk,
               providerName: g.name,
               id: mid,
-              info: ModelRegistry.infer(ModelInfo(id: mid, displayName: mid)),
+              info: ModelSpecResolver.instance.specFromId(
+                mid,
+                displayName: mid,
+              ),
               pinned: true,
               selected: false,
             ),

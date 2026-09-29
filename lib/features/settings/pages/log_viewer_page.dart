@@ -2095,6 +2095,8 @@ Color _contextSourceColor(ContextSource source, {required bool isDark}) {
     case ContextSource.worldBook:
       base = const Color(0xFF55B685);
     case ContextSource.instructionInjection:
+    case ContextSource.skills:
+    case ContextSource.workspace:
       base = const Color(0xFFE0975C);
     case ContextSource.searchPrompt:
       base = const Color(0xFF56AEBF);
@@ -2120,6 +2122,10 @@ String _contextSourceLabel(AppLocalizations l10n, ContextSource source) {
       return l10n.contextLogSourceSearchPrompt;
     case ContextSource.instructionInjection:
       return l10n.contextLogSourceInstructionInjection;
+    case ContextSource.skills:
+      return l10n.contextUsageBucketSkills;
+    case ContextSource.workspace:
+      return l10n.contextUsageBucketWorkspace;
     case ContextSource.worldBook:
       return l10n.contextLogSourceWorldBook;
     case ContextSource.memorySnapshot:
