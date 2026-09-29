@@ -237,6 +237,51 @@ _ImportResult _decodeSingle(BuildContext context, String s) {
   }
 }
 
+/// 解析文本中的供应商分享串（或 ChatBox JSON）并写入配置。
+///
+/// 扫码、相册、粘贴与桌面导入共用这一份实现，避免各处各写一遍。
+Future<List<String>> importProvidersFromText(
+  BuildContext context,
+  String raw,
+) async {
+  final settings = context.read<SettingsProvider>();
+  final lines = raw
+      .split(RegExp(r'\r?\n'))
+      .map((e) => e.trim())
+      .where((e) => e.isNotEmpty)
+      .toList();
+  if (lines.isEmpty) throw const FormatException('Empty input');
+  List<_ImportResult> decode(String line) {
+    if (line.startsWith('ai-provider:v1:')) {
+      return [_decodeSingle(context, line)];
+    }
+    if (line.startsWith('{')) return _decodeChatBoxJson(context, line);
+    throw const FormatException('Unsupported format');
+  }
+
+  final results = <_ImportResult>[];
+  if (lines.length > 1) {
+    for (final line in lines) {
+      try {
+        results.addAll(decode(line));
+      } catch (_) {
+        // 跳过无法解析的行。
+      }
+    }
+    if (results.isEmpty) throw const FormatException('No valid lines');
+  } else {
+    results.addAll(decode(lines.first));
+  }
+  for (final r in results) {
+    await settings.setProviderConfig(r.key, r.cfg);
+    final order = List<String>.of(settings.providersOrder);
+    order.remove(r.key);
+    order.insert(0, r.key);
+    await settings.setProvidersOrder(order);
+  }
+  return [for (final r in results) r.key];
+}
+
 Future<void> showImportProviderSheet(BuildContext context) async {
   final cs = Theme.of(context).colorScheme;
   final controller = TextEditingController();
@@ -316,62 +361,17 @@ Future<void> showImportProviderSheet(BuildContext context) async {
                               if (code == null || code.isEmpty) return;
                               try {
                                 if (!ctx.mounted) return;
-                                final settings = ctx.read<SettingsProvider>();
-                                final results = <_ImportResult>[];
-                                // 支持组合多供应商二维码内容：换行分隔的分享字符串或 JSON
-                                final parts = code
-                                    .split(RegExp(r'\r?\n+'))
-                                    .map((e) => e.trim())
-                                    .where((e) => e.isNotEmpty)
-                                    .toList();
-                                if (parts.length > 1) {
-                                  for (final p in parts) {
-                                    try {
-                                      if (p.startsWith('ai-provider:v1:')) {
-                                        results.add(_decodeSingle(ctx, p));
-                                      } else if (p.startsWith('{')) {
-                                        results.addAll(
-                                          _decodeChatBoxJson(ctx, p),
-                                        );
-                                      }
-                                    } catch (_) {}
-                                  }
-                                  if (results.isEmpty) {
-                                    throw const FormatException(
-                                      'Unsupported format',
-                                    );
-                                  }
-                                } else {
-                                  final p = parts.first;
-                                  if (p.startsWith('ai-provider:v1:')) {
-                                    results.add(_decodeSingle(ctx, p));
-                                  } else if (p.startsWith('{')) {
-                                    results.addAll(_decodeChatBoxJson(ctx, p));
-                                  } else {
-                                    throw const FormatException(
-                                      'Unsupported format',
-                                    );
-                                  }
-                                }
-                                for (final r in results) {
-                                  await settings.setProviderConfig(
-                                    r.key,
-                                    r.cfg,
-                                  );
-                                  final order = List<String>.of(
-                                    settings.providersOrder,
-                                  );
-                                  order.remove(r.key);
-                                  order.insert(0, r.key);
-                                  await settings.setProvidersOrder(order);
-                                }
+                                final imported = await importProvidersFromText(
+                                  ctx,
+                                  code,
+                                );
                                 if (!ctx.mounted || !context.mounted) return;
                                 Navigator.of(ctx).pop();
                                 showAppSnackBar(
                                   context,
                                   message: l10n
                                       .importProviderSheetImportSuccessMessage(
-                                        results.length,
+                                        imported.length,
                                       ),
                                   type: NotificationType.success,
                                 );
@@ -433,57 +433,17 @@ Future<void> showImportProviderSheet(BuildContext context) async {
                                   throw 'QR not detected';
                                 }
                                 if (!ctx.mounted) return;
-                                final settings = ctx.read<SettingsProvider>();
-                                final results = <_ImportResult>[];
-                                final parts = scannedCode
-                                    .split(RegExp(r'\r?\n+'))
-                                    .map((e) => e.trim())
-                                    .where((e) => e.isNotEmpty)
-                                    .toList();
-                                if (parts.length > 1) {
-                                  for (final p in parts) {
-                                    try {
-                                      if (p.startsWith('ai-provider:v1:')) {
-                                        results.add(_decodeSingle(ctx, p));
-                                      } else if (p.startsWith('{')) {
-                                        results.addAll(
-                                          _decodeChatBoxJson(ctx, p),
-                                        );
-                                      }
-                                    } catch (_) {}
-                                  }
-                                  if (results.isEmpty) {
-                                    throw 'Unsupported content';
-                                  }
-                                } else {
-                                  final p = parts.first;
-                                  if (p.startsWith('ai-provider:v1:')) {
-                                    results.add(_decodeSingle(ctx, p));
-                                  } else if (p.startsWith('{')) {
-                                    results.addAll(_decodeChatBoxJson(ctx, p));
-                                  } else {
-                                    throw 'Unsupported content';
-                                  }
-                                }
-                                for (final r in results) {
-                                  await settings.setProviderConfig(
-                                    r.key,
-                                    r.cfg,
-                                  );
-                                  final order = List<String>.of(
-                                    settings.providersOrder,
-                                  );
-                                  order.remove(r.key);
-                                  order.insert(0, r.key);
-                                  await settings.setProvidersOrder(order);
-                                }
+                                final imported = await importProvidersFromText(
+                                  ctx,
+                                  scannedCode,
+                                );
                                 if (!ctx.mounted || !context.mounted) return;
                                 Navigator.of(ctx).pop();
                                 showAppSnackBar(
                                   context,
                                   message: l10n
                                       .importProviderSheetImportSuccessMessage(
-                                        results.length,
+                                        imported.length,
                                       ),
                                   type: NotificationType.success,
                                 );
@@ -568,60 +528,17 @@ Future<void> showImportProviderSheet(BuildContext context) async {
                             final raw = controller.text.trim();
                             if (raw.isEmpty) return;
                             try {
-                              final settings = ctx.read<SettingsProvider>();
-                              final results = <_ImportResult>[];
-                              // 支持多行输入，每个非空行是分享字符串或 JSON
-                              final lines = raw
-                                  .split(RegExp(r'\r?\n'))
-                                  .map((e) => e.trim())
-                                  .where((e) => e.isNotEmpty)
-                                  .toList();
-                              if (lines.length > 1) {
-                                for (final line in lines) {
-                                  try {
-                                    if (line.startsWith('ai-provider:v1:')) {
-                                      results.add(_decodeSingle(ctx, line));
-                                    } else if (line.startsWith('{')) {
-                                      results.addAll(
-                                        _decodeChatBoxJson(ctx, line),
-                                      );
-                                    }
-                                  } catch (_) {
-                                    // 跳过无效行
-                                  }
-                                }
-                                if (results.isEmpty) {
-                                  throw const FormatException('No valid lines');
-                                }
-                              } else {
-                                final text = lines.first;
-                                if (text.startsWith('ai-provider:v1:')) {
-                                  results.add(_decodeSingle(ctx, text));
-                                } else if (text.startsWith('{')) {
-                                  results.addAll(_decodeChatBoxJson(ctx, text));
-                                } else {
-                                  throw const FormatException(
-                                    'Unsupported format',
-                                  );
-                                }
-                              }
-                              for (final r in results) {
-                                await settings.setProviderConfig(r.key, r.cfg);
-                                // 放到最前
-                                final order = List<String>.of(
-                                  settings.providersOrder,
-                                );
-                                order.remove(r.key);
-                                order.insert(0, r.key);
-                                await settings.setProvidersOrder(order);
-                              }
+                              final imported = await importProvidersFromText(
+                                ctx,
+                                raw,
+                              );
                               if (!ctx.mounted || !context.mounted) return;
                               Navigator.of(ctx).pop();
                               showAppSnackBar(
                                 context,
                                 message: l10n
                                     .importProviderSheetImportSuccessMessage(
-                                      results.length,
+                                      imported.length,
                                     ),
                                 type: NotificationType.success,
                               );

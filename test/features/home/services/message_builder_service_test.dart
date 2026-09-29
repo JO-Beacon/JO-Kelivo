@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:Kelivo/core/models/assistant.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
+import 'package:Kelivo/core/models/model_spec.dart';
 import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
@@ -537,7 +538,7 @@ void main() {
     });
 
     test(
-      'assistant audio media refs trip apiMessagesContainAudioAttachments',
+      'assistant audio media refs trip unsupportedMediaModalitiesInApiMessages',
       () {
         final builder = MessageBuilderService(
           chatService: _FakeChatService(const {}),
@@ -564,11 +565,78 @@ void main() {
         );
         final generation = _messageGenerationServiceForAudioCheck();
         expect(
-          generation.apiMessagesContainAudioAttachments(apiMessages),
-          isTrue,
+          generation.unsupportedMediaModalitiesInApiMessages(
+            apiMessages,
+            ModelSpec(
+              id: 'text-only',
+              displayName: 'text-only',
+              input: const [Modality.text],
+            ),
+          ),
+          contains(Modality.audio),
         );
       },
     );
+
+    test('历史里的图片与视频同样按模型能力判断', () {
+      final builder = MessageBuilderService(
+        chatService: _FakeChatService(const {}),
+        contextProvider: _FakeBuildContext(),
+      );
+      final apiMessages = builder.buildApiMessages(
+        messages: [
+          ChatMessage(
+            id: 'u1',
+            role: 'user',
+            conversationId: 'c1',
+            parts: const [
+              TextPart('look'),
+              FilePart(uri: '/tmp/a.png', name: 'a.png', mime: 'image/png'),
+              FilePart(uri: '/tmp/a.mp4', name: 'a.mp4', mime: 'video/mp4'),
+            ],
+          ),
+        ],
+        currentConversation: Conversation(title: 'test'),
+      );
+      final generation = _messageGenerationServiceForAudioCheck();
+      final textOnly = ModelSpec(
+        id: 'text-only',
+        displayName: 'text-only',
+        input: [Modality.text],
+      );
+
+      // 读不了：图片与视频都要被列出，不能有哪个类型溜过去。
+      expect(
+        generation.unsupportedMediaModalitiesInApiMessages(
+          apiMessages,
+          textOnly,
+        ),
+        [Modality.image, Modality.video],
+      );
+
+      // 读得了：不该拦。
+      expect(
+        generation.unsupportedMediaModalitiesInApiMessages(
+          apiMessages,
+          ModelSpec(
+            id: 'vision',
+            displayName: 'vision',
+            input: [Modality.text, Modality.image, Modality.video],
+          ),
+        ),
+        isEmpty,
+      );
+
+      // OCR 打开时图片会被转成文本，只有视频仍被拦。
+      expect(
+        generation.unsupportedMediaModalitiesInApiMessages(
+          apiMessages,
+          textOnly,
+          ocrActive: true,
+        ),
+        [Modality.video],
+      );
+    });
   });
 
   group('MessageBuilderService.buildApiMessages', () {

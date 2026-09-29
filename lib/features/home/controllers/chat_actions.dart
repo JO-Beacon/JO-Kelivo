@@ -1,4 +1,6 @@
 import 'dart:async';
+import '../../../core/services/api/chat_api_helpers.dart';
+import '../../../core/services/model_spec/model_spec_resolver.dart';
 import '../../../core/models/provider_oauth.dart';
 import '../services/context_usage_service.dart';
 import '../../../core/models/reasoning_request.dart';
@@ -40,11 +42,16 @@ import 'latest_wins_checkpoint_writer.dart';
 import 'stream_controller.dart' as stream_ctrl;
 import 'streaming_content_notifier.dart' show RetryStatus;
 
-final class UnsupportedAudioAttachmentException implements Exception {
-  const UnsupportedAudioAttachmentException();
+/// 请求内含模型读不了、或接口不收的附件（当前输入或历史消息）。
+///
+/// [toString] 直接给出错误码，让上层文案映射复用同一条分支。
+final class UnsupportedAttachmentException implements Exception {
+  const UnsupportedAttachmentException(this.errorCode);
+
+  final String errorCode;
 
   @override
-  String toString() => 'audio_attachment_unsupported';
+  String toString() => errorCode;
 }
 
 final class _BarrierStreamSubscription<T> implements StreamSubscription<T> {
@@ -1088,40 +1095,18 @@ class ChatActions {
     });
   }
 
-  bool _supportsAudioAttachmentsForProvider(
-    SettingsProvider settings, {
-    required String providerKey,
-    required String modelId,
-  }) {
-    return messageGenerationService.supportsAudioAttachmentsForProvider(
-      settings,
-      providerKey: providerKey,
-      modelId: modelId,
-    );
-  }
-
-  bool _hasUnsupportedAudioAttachments({
+  /// 历史消息的附件闸门；返回错误码，null 表示放行。
+  ///
+  /// 与当前输入同一套规则，另加官方 OpenAI 拒收的音频容器。
+  String? _attachmentGateErrorForHistory({
     required List<ChatMessage> messages,
     required Conversation conversation,
     required SettingsProvider settings,
     required String providerKey,
     required String modelId,
-    ChatInputData? pendingInput,
     int? maxRawTruncateIndex,
   }) {
-    if (_supportsAudioAttachmentsForProvider(
-      settings,
-      providerKey: providerKey,
-      modelId: modelId,
-    )) {
-      return false;
-    }
-
-    if (pendingInput != null &&
-        messageGenerationService.inputContainsAudioAttachments(pendingInput)) {
-      return true;
-    }
-
+    final config = settings.getProviderConfig(providerKey);
     final apiMessages = messageGenerationService.messageBuilderService
         .buildApiMessages(
           messages: messages,
@@ -1131,8 +1116,16 @@ class ChatActions {
             maxRawTruncateIndex: maxRawTruncateIndex,
           ),
         );
-    return messageGenerationService.apiMessagesContainAudioAttachments(
-      apiMessages,
+    return attachmentGateError(
+      unsupportedModalities:
+          messageGenerationService.unsupportedMediaModalitiesInApiMessages(
+            apiMessages,
+            ModelSpecResolver.instance.spec(config, modelId),
+            ocrActive: settings.ocrActive,
+          ),
+      unsupportedAudioContainers: isOfficialOpenAIEndpoint(config.baseUrl)
+          ? officialOpenAIAudioContainerConflictsInApiMessages(apiMessages)
+          : const <String>[],
     );
   }
 
@@ -1255,13 +1248,22 @@ class ChatActions {
 
     // 当前输入无需读取数据库即可检查；历史消息的检查移到后台生成阶段，
     // 让消息对先落库并显示。
-    if (!_supportsAudioAttachmentsForProvider(
-          settings,
-          providerKey: providerKey,
-          modelId: modelId,
-        ) &&
-        messageGenerationService.inputContainsAudioAttachments(input)) {
-      return ChatActionResult.error('audio_attachment_unsupported');
+    // 附件按模型输入能力与接口可接受的音频容器把关：读不了、发不出去就当场
+    // 拦住并告知。静默丢弃会让用户以为附件已经发出去了，所以这里不丢。
+    final inputConfig = settings.getProviderConfig(providerKey);
+    final inputSpec = ModelSpecResolver.instance.spec(inputConfig, modelId);
+    final inputAttachmentError = attachmentGateError(
+      unsupportedModalities: unsupportedInputModalities(
+        input,
+        inputSpec,
+        ocrActive: settings.ocrActive,
+      ),
+      unsupportedAudioContainers: isOfficialOpenAIEndpoint(inputConfig.baseUrl)
+          ? unsupportedOfficialOpenAIAudioContainers(input)
+          : const <String>[],
+    );
+    if (inputAttachmentError != null) {
+      return ChatActionResult.error(inputAttachmentError);
     }
 
     late final ChatMessage userMessage;
@@ -1358,15 +1360,16 @@ class ChatActions {
           if (message.id != userMessage.id && message.id != assistantMessage.id)
             message,
       ];
-      if (_hasUnsupportedAudioAttachments(
+      final historyAttachmentError = _attachmentGateErrorForHistory(
         messages: existingContextMessages,
         conversation: conversation,
         settings: settings,
         providerKey: providerKey,
         modelId: modelId,
         maxRawTruncateIndex: null,
-      )) {
-        throw const UnsupportedAudioAttachmentException();
+      );
+      if (historyAttachmentError != null) {
+        throw UnsupportedAttachmentException(historyAttachmentError);
       }
 
       streamController.toolParts.remove(assistantMessage.id);
@@ -1649,15 +1652,16 @@ class ChatActions {
     final providerKey = modelConfig.providerKey!;
     final modelId = modelConfig.modelId!;
 
-    if (_hasUnsupportedAudioAttachments(
+    final historyAttachmentErrorBeforeSend = _attachmentGateErrorForHistory(
       messages: completeMessages,
       conversation: conversation.copyWith(truncateIndex: -1),
       settings: settings,
       providerKey: providerKey,
       modelId: modelId,
       maxRawTruncateIndex: -1,
-    )) {
-      return ChatActionResult.error('audio_attachment_unsupported');
+    );
+    if (historyAttachmentErrorBeforeSend != null) {
+      return ChatActionResult.error(historyAttachmentErrorBeforeSend);
     }
 
     final String? fromMessageId;

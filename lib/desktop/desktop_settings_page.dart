@@ -35,6 +35,7 @@ import '../features/assistant/widgets/assistant_selection_bars.dart';
 import '../core/models/assistant_list_item.dart';
 import 'dart:io' show Directory, File, Platform;
 import 'add_provider_dialog.dart' show showDesktopAddProviderDialog;
+import 'import_provider_dialog.dart' show showDesktopImportProviderDialog;
 import 'model_edit_dialog.dart'
     show showDesktopCreateModelDialog, showDesktopModelEditDialog;
 // 使用统一模型选择器（桌面平台使用桌面对话框）

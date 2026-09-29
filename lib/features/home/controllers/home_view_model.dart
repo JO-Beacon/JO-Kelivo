@@ -169,7 +169,6 @@ class HomeViewModel extends ChangeNotifier {
   VoidCallback? onScrollToBottom;
 
   /// 需要触感反馈时调用。
-  VoidCallback? onHapticFeedback;
 
   /// 会话成功切换后调用（用于动画）。
   VoidCallback? onConversationSwitched;
@@ -481,8 +480,6 @@ class HomeViewModel extends ChangeNotifier {
 
     await _clearSuggestionsFor(conversation.id);
 
-    onHapticFeedback?.call();
-
     final result = await _chatActions.sendMessage(
       input: input,
       conversation: conversation,
@@ -554,7 +551,6 @@ class HomeViewModel extends ChangeNotifier {
     // 在重新生成前设置图片清理回调
     _chatActions.onScheduleImageSanitize = onScheduleImageSanitize;
 
-    onHapticFeedback?.call();
     await _clearSuggestionsFor(conversation.id);
 
     final result = await _chatActions.regenerateAtMessage(

@@ -251,6 +251,7 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
   List<Map<String, dynamic>> messages, {
   List<String>? userMediaPaths,
   required bool canImageInput,
+  bool canAudioInput = false,
   required bool allowRemoteImages,
   required ReasoningReplayPolicy reasoningReplay,
   ReasoningReplayField replayField = ReasoningReplayField.reasoningContent,
@@ -379,7 +380,8 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
         role == 'user' &&
         i == lastUserIndex &&
         pendingAssistantMediaUrls.isNotEmpty;
-    final hasInternalMedia = canImageInput && internalMediaRefs.isNotEmpty;
+    final hasInternalMedia =
+        (canImageInput || canAudioInput) && internalMediaRefs.isNotEmpty;
 
     if (originalContent is List) {
       dynamic content = canImageInput
@@ -401,7 +403,7 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
             final type = (part['type'] ?? '').toString();
             return type == 'image_url' || type == 'video_url';
           });
-      if (canImageInput &&
+      if ((canImageInput || canAudioInput) &&
           (hasInternalMedia ||
               hasAttachedImages ||
               shouldAttachAssistantMedia ||
@@ -517,7 +519,17 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
           final bool isInlineUrl =
               isRemoteHttpUrl(mediaPath) || mediaPath.startsWith('data:');
           final String mime = mimeForInternalMediaRef(mediaRef);
-          if (isAudioMime(mime)) continue;
+          if (isAudioMime(mime)) {
+            // 模型声明支持音频时真正送进去；不支持则维持原有丢弃行为，
+            // 背景调用没有用户可打断，不改成报错。
+            if (canAudioInput && !isAssistant) {
+              final audioPart = await openAIAudioContentPartFor(mediaRef, mime);
+              if (audioPart != null) parts.add(audioPart);
+            }
+            continue;
+          }
+          // 不支持图片输入时，图片与视频一律不进请求。
+          if (!canImageInput) continue;
           final bool isVideo = isVideoMime(mime);
           final String? dataUrl = isInlineUrl
               ? mediaPath
@@ -545,12 +557,14 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
           // Keep assistant List content image-free; media is stashed above.
           content = [
             for (final part in parts)
-              if (part['type'] != 'image_url' && part['type'] != 'video_url')
+              if (part['type'] != 'image_url' &&
+                  part['type'] != 'video_url' &&
+                  part['type'] != 'input_audio')
                 part,
           ];
           if (content.isEmpty) content = raw;
         } else {
-          content = parts;
+          content = parts.isEmpty ? raw : parts;
         }
       }
       outMsg['content'] = content;
@@ -624,7 +638,7 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
       keepDisallowedImageText: canImageInput,
       skipImageParsing: skipImageParsing,
     );
-    if (!canImageInput) {
+    if (!canImageInput && !canAudioInput) {
       outMsg['content'] = parsed.text;
       out.add(outMsg);
       continue;
@@ -725,7 +739,17 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
       if (!seenSources.add(normalized)) continue;
       final bool isInlineUrl = isRemoteHttpUrl(p) || p.startsWith('data:');
       final String mime = mimeForInternalMediaRef(mediaRef);
-      if (isAudioMime(mime)) continue;
+      if (isAudioMime(mime)) {
+        // 模型声明支持音频时真正送进去；不支持则维持原有丢弃行为，
+        // 背景调用没有用户可打断，不改成报错。
+        if (canAudioInput && !isAssistant) {
+          final audioPart = await openAIAudioContentPartFor(mediaRef, mime);
+          if (audioPart != null) parts.add(audioPart);
+        }
+        continue;
+      }
+      // 不支持图片输入时，图片与视频一律不进请求。
+      if (!canImageInput) continue;
       final bool isVideo = isVideoMime(mime);
       final String? dataUrl = isInlineUrl
           ? p
@@ -789,6 +813,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
   required ToolCallHandler onToolCall,
   required List<String>? userImagePaths,
   required bool canImageInput,
+  bool canAudioInput = false,
   required bool allowRemoteImages,
   required bool isClaudeUpstream,
   bool skipImageParsing = false,
@@ -851,6 +876,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
           currentMessages,
           userMediaPaths: userImagePaths,
           canImageInput: canImageInput,
+          canAudioInput: canAudioInput,
           allowRemoteImages: allowRemoteImages,
           reasoningReplay: spec.reasoning.replay,
           replayField: spec.reasoning.replayField,
@@ -978,6 +1004,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsNonStreamToolFollowUps({
   required ToolCallHandler onToolCall,
   required List<String>? userImagePaths,
   required bool canImageInput,
+  bool canAudioInput = false,
   required bool allowRemoteImages,
   required bool isClaudeUpstream,
   bool skipImageParsing = false,
@@ -1034,6 +1061,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsNonStreamToolFollowUps({
         currentMessages,
         userMediaPaths: userImagePaths,
         canImageInput: canImageInput,
+        canAudioInput: canAudioInput,
         allowRemoteImages: allowRemoteImages,
         reasoningReplay: spec.reasoning.replay,
         replayField: spec.reasoning.replayField,

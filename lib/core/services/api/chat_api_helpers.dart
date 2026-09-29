@@ -874,6 +874,45 @@ class ParsedTextAndImages {
   const ParsedTextAndImages(this.text, this.images);
 }
 
+/// 是否为官方 OpenAI 接口。
+///
+/// 只有官方这一头拒收 wav／mp3 之外的音频容器；兼容网关大多放宽，
+/// 所以按主机名区分，不把网关一起拦掉。
+bool isOfficialOpenAIEndpoint(String baseUrl) {
+  final host = Uri.tryParse(baseUrl.trim())?.host.toLowerCase();
+  return host == 'api.openai.com';
+}
+
+/// 读取音频引用的裸 base64 载荷（不带 data URL 前缀）。
+Future<String?> _audioRefBase64(String source) async {
+  if (source.startsWith('data:')) {
+    final idx = source.indexOf('base64,');
+    return idx > 0 ? source.substring(idx + 7) : null;
+  }
+  return tryEncodeBase64File(source, withPrefix: false);
+}
+
+/// OpenAI 音频输入内容块（Chat Completions 与 Responses 共用同一形状）。
+///
+/// 容器无法判定或载荷读取失败时返回 null。协议只列了 wav 与 mp3；
+/// 官方接口拒收的容器由发送前的闸门挡住，走到这里按归类结果透传，不静默丢弃。
+///
+/// 协议只列了 wav 与 mp3；官方接口拒收的容器由发送前的闸门挡住，
+/// 走到这里就按归类结果透传，不再静默丢弃。
+Future<Map<String, dynamic>?> openAIAudioContentPartFor(
+  InternalMediaRef ref,
+  String mime,
+) async {
+  final format = audioContainerToken(mime, ref.uri);
+  if (format == null) return null;
+  final data = await _audioRefBase64(ref.uri);
+  if (data == null || data.isEmpty) return null;
+  return {
+    'type': 'input_audio',
+    'input_audio': {'data': data, 'format': format},
+  };
+}
+
 String mimeForInternalMediaRef(InternalMediaRef ref) {
   final explicit = ref.mime?.trim() ?? '';
   if (explicit.isNotEmpty) return explicit;

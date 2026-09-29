@@ -1396,7 +1396,9 @@ class _HomePageState extends State<HomePage>
                 child: Builder(
                   builder: (context) {
                     Widget input = _buildChatInputBar(context, isTablet: true);
-                    input = Center(
+                    input = Align(
+                      alignment: Alignment.bottomCenter,
+                      heightFactor: 1,
                       child: ConstrainedBox(
                         constraints: BoxConstraints(
                           maxWidth: wideChatLayout
@@ -1714,6 +1716,7 @@ class _HomePageState extends State<HomePage>
       hasQueuedInput: _controller.currentQueuedInput != null,
       queuedPreviewText: _controller.currentQueuedInput?.input.text,
       onCancelQueuedInput: _controller.cancelQueuedMessage,
+      onExpandedChanged: _controller.setInputBarExpanded,
       onQuickPhrase: _showQuickPhraseMenu,
       onLongPressQuickPhrase: () {
         Navigator.of(

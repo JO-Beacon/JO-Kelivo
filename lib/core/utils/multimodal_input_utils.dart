@@ -66,6 +66,40 @@ bool isAudioMime(String mime) => mime.toLowerCase().startsWith('audio/');
 
 bool isVideoMime(String mime) => mime.toLowerCase().startsWith('video/');
 
+/// 音频容器的规范标记（wav、mp3、m4a 等）；非音频或无法判定时返回 null。
+///
+/// 官方 OpenAI 的音频输入只接受 wav 与 mp3，其它容器由接口层拒收；
+/// 这里只做归类，接受与否由调用方决定。
+String? audioContainerToken(String mime, String source) {
+  final normalized = mime.toLowerCase().split(';').first.trim();
+  if (!normalized.startsWith('audio/')) return null;
+  switch (normalized) {
+    case 'audio/wav':
+    case 'audio/x-wav':
+    case 'audio/wave':
+    case 'audio/vnd.wave':
+      return 'wav';
+    case 'audio/mpeg':
+    case 'audio/mp3':
+    case 'audio/mpeg3':
+      return 'mp3';
+  }
+  final extension = _fileExtensionOfSource(source);
+  if (extension != null) return extension;
+  final subtype = normalized.substring('audio/'.length);
+  final stripped = subtype.startsWith('x-') ? subtype.substring(2) : subtype;
+  return stripped.isEmpty ? null : stripped;
+}
+
+String? _fileExtensionOfSource(String source) {
+  if (source.startsWith('data:') || source.startsWith('http')) return null;
+  final path = source.split('?').first;
+  final name = path.substring(path.lastIndexOf('/') + 1);
+  final dot = name.lastIndexOf('.');
+  if (dot <= 0 || dot == name.length - 1) return null;
+  return name.substring(dot + 1).toLowerCase();
+}
+
 String inferMediaMimeFromSource(String source, {String fallbackMime = ''}) {
   final lower = source.toLowerCase();
   if (lower.startsWith('data:')) {

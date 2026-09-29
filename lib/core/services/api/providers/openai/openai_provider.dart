@@ -24,7 +24,10 @@ import 'chat_completions_api.dart';
 import 'chat_completions_decoder.dart';
 import 'openai_vendor_compat.dart';
 import 'openai_request_shaping.dart'
-    show applyOpenAIResolvedRequest, openaiUsageFromObj, mergeOpenAICompatibleUsage;
+    show
+        applyOpenAIResolvedRequest,
+        openaiUsageFromObj,
+        mergeOpenAICompatibleUsage;
 import '../../reasoning/reasoning_dialects.dart' show ReasoningTransport;
 import '../../../model_spec/model_spec_resolver.dart';
 import 'responses_api.dart';
@@ -140,6 +143,7 @@ Stream<StreamChunk> sendOpenAIStream(
   final isReasoning = effectiveInfo.abilities.contains(ModelAbility.reasoning);
   final wantsImageOutput = effectiveInfo.output.contains(Modality.image);
   final bool canImageInput = effectiveInfo.input.contains(Modality.image);
+  final bool canAudioInput = effectiveInfo.input.contains(Modality.audio);
 
   final effort = openAIEffortForBudget(thinkingBudget, upstreamModelId);
   final spec = ModelSpecResolver.instance.spec(config, modelId);
@@ -338,7 +342,8 @@ Stream<StreamChunk> sendOpenAIStream(
         m[multimodalInternalMediaPathsKey],
       );
       // Consume injected media refs for user and assistant history turns.
-      final hasInternalMedia = canImageInput && internalMediaRefs.isNotEmpty;
+      final hasInternalMedia =
+          (canImageInput || canAudioInput) && internalMediaRefs.isNotEmpty;
       final hasAttachedImages =
           canImageInput &&
           (m['role'] == 'user') &&
@@ -364,7 +369,8 @@ Stream<StreamChunk> sendOpenAIStream(
           keepDisallowedImageText: canImageInput,
           skipImageParsing: skipImageParsing,
         );
-        if (!canImageInput) {
+        // 只支持音频、不支持图片的模型也必须走到下面的媒体循环，否则音频发不出去。
+        if (!canImageInput && !canAudioInput) {
           if (isAssistant) {
             input.add({
               'type': 'message',
@@ -438,12 +444,18 @@ Stream<StreamChunk> sendOpenAIStream(
         for (final mediaRef in supplementalRefs) {
           final p = mediaRef.uri;
           final String mime = mimeForInternalMediaRef(mediaRef);
+          // 音频按官方 schema 的 input_audio 部件下发；容器与格式由发送前的闸门把关。
+          if (canAudioInput && isAudioMime(mime) && !isAssistant) {
+            final audioPart = await openAIAudioContentPartFor(mediaRef, mime);
+            if (audioPart != null && seenImageSources.add(normalizeSrc(p))) {
+              parts.add(audioPart);
+              continue;
+            }
+          }
           final bool isAv = isAudioMime(mime) || isVideoMime(mime);
           if (isAv) {
-            // Responses path has no first-class A/V input parts here; never
-            // encode video/audio as input_image. Keep a text reference for both
-            // remote and local paths so pure A/V attachments do not become
-            // content: [] (API reject / silent drop).
+            // 这条路径没有视频部件；音频在模型不支持时也走这里。两者都保留一行文本
+            // 引用，避免纯音视频附件把 content 变成空数组（接口拒收或静默丢弃）。
             final normalized = normalizeSrc(p);
             if (seenImageSources.add(normalized)) {
               parts.add({
@@ -463,6 +475,8 @@ Stream<StreamChunk> sendOpenAIStream(
             });
             continue;
           }
+          // 不支持图片输入时，图片一律不进请求。
+          if (!canImageInput) continue;
           final normalized = normalizeSrc(p);
           if (!seenImageSources.add(normalized)) continue;
           final dataUrl = (isRemoteHttpUrl(p) || p.startsWith('data:'))
@@ -579,6 +593,7 @@ Stream<StreamChunk> sendOpenAIStream(
       messages,
       userMediaPaths: userImagePaths,
       canImageInput: canImageInput,
+      canAudioInput: canAudioInput,
       allowRemoteImages: allowRemoteImages,
       reasoningReplay: spec.reasoning.replay,
       replayField: spec.reasoning.replayField,
@@ -824,6 +839,7 @@ Stream<StreamChunk> sendOpenAIStream(
           url: url,
           info: info,
           spec: spec,
+          canAudioInput: canAudioInput,
           messages: messages,
           requestBody: body,
           firstObj: lastObj,
@@ -1087,6 +1103,7 @@ Stream<StreamChunk> sendOpenAIStream(
       info: info,
       spec: spec,
       reasoningRequest: reasoning,
+      canAudioInput: canAudioInput,
       messages: messages,
       firstToolAcc: toolAcc,
       firstAssistantContent: assistantContentBuffer,

@@ -784,22 +784,55 @@ class _ProviderOAuthHttpClient extends http.BaseClient {
       return result;
     }
 
-    var response = await inner.send(build());
-    if (response.statusCode != 401) return response;
-    await response.stream.drain<void>();
-    _checkSession();
-    config = await service.resolve(config, force: true);
-    response = await inner.send(build());
-    if (response.statusCode == 401) {
-      await response.stream.drain<void>();
-      await service.markLoginRequired(config);
-      throw ProviderOAuthException(
-        ProviderOAuthFailure.loginRequired,
-        providerId: config.id,
-        statusCode: 401,
-      );
+    var refreshed = false;
+    var retriedClaudeVersion = false;
+    while (true) {
+      final requestVersion = claudeCodeVersion;
+      final response = await inner.send(build());
+      if (response.statusCode == 401) {
+        await response.stream.drain<void>();
+        _checkSession();
+        if (refreshed) {
+          await service.markLoginRequired(config);
+          throw ProviderOAuthException(
+            ProviderOAuthFailure.loginRequired,
+            providerId: config.id,
+            statusCode: 401,
+          );
+        }
+        config = await service.resolve(config, force: true);
+        refreshed = true;
+        continue;
+      }
+      // 服务端要求更高版本的 Claude Code 时，按它给的最低版本重发一次。
+      if (claudeMessages &&
+          request.method == 'POST' &&
+          response.statusCode == 400 &&
+          !retriedClaudeVersion) {
+        final bytes = await response.stream.toBytes();
+        _checkSession();
+        if (adoptRequiredClaudeCodeVersion(
+          utf8.decode(bytes, allowMalformed: true),
+          requestVersion: requestVersion,
+        )) {
+          retriedClaudeVersion = true;
+          // 从原始请求体重建，使版本、账单头与 cch 保持一致，
+          // 且不会重复叠加 system 块或工具前缀。
+          continue;
+        }
+        return http.StreamedResponse(
+          Stream.value(bytes),
+          response.statusCode,
+          contentLength: response.contentLength,
+          request: response.request,
+          headers: response.headers,
+          isRedirect: response.isRedirect,
+          persistentConnection: response.persistentConnection,
+          reasonPhrase: response.reasonPhrase,
+        );
+      }
+      return response;
     }
-    return response;
   }
 
   @override

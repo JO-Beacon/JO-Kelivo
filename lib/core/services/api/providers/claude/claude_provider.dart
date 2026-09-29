@@ -388,9 +388,9 @@ Stream<StreamChunk> sendClaudeStreamEvents(
         if (!isVertex) 'model': upstreamModelId,
         if (isVertex) 'anthropic_version': 'vertex-2023-10-16',
         'max_tokens': maxTokens ?? spec.maxOutput ?? 64000,
+        if (systemPrompt.isNotEmpty) 'system': systemPrompt,
         'messages': convo,
         'stream': stream,
-        if (systemPrompt.isNotEmpty) 'system': systemPrompt,
         if (!isVertex && config.claudePromptCachingEnabled == true)
           'cache_control': ProviderConfig.claudePromptCacheControl(
             config.claudePromptCachingTtl,

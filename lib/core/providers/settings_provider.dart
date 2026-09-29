@@ -3693,6 +3693,10 @@ Do not interpret or translate—only transcribe and describe what is visually pr
   bool _ocrEnabled = false;
   bool get ocrEnabled => _ocrEnabled;
 
+  /// OCR 已开启且配好了 OCR 模型：此时图片会被转成文本发出。
+  bool get ocrActive =>
+      _ocrEnabled && _ocrModelProvider != null && _ocrModelId != null;
+
   Future<void> setOcrModel(String providerKey, String modelId) async {
     _ocrModelProvider = providerKey;
     _ocrModelId = modelId;

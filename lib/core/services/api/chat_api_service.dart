@@ -130,19 +130,58 @@ class ChatApiService {
     return content;
   }
 
-  static Future<List<Map<String, dynamic>>> _stripImageInputsFromMessages(
-    List<Map<String, dynamic>> messages,
-  ) async {
+  @visibleForTesting
+  static Future<List<Map<String, dynamic>>> stripUnsupportedMediaInputsForTest(
+    List<Map<String, dynamic>> messages, {
+    required bool stripImages,
+    required bool stripAudio,
+  }) => _stripUnsupportedMediaInputsFromMessages(
+    messages,
+    stripImages: stripImages,
+    stripAudio: stripAudio,
+  );
+
+  /// 剔掉模型读不了的媒体引用，只删不支持的那几类。
+  ///
+  /// 以前是按「不支持图片」整条媒体引用一起删，会把音频连坐删掉；
+  /// 模型支持音频但不支持图片时，音频必须留下来。
+  static Future<List<Map<String, dynamic>>>
+  _stripUnsupportedMediaInputsFromMessages(
+    List<Map<String, dynamic>> messages, {
+    required bool stripImages,
+    required bool stripAudio,
+  }) async {
     final out = <Map<String, dynamic>>[];
     for (final message in messages) {
       final copy = Map<String, dynamic>.from(message);
-      copy.remove(multimodalInternalMediaPathsKey);
+      final keptRefs = <Map<String, dynamic>>[];
+      for (final ref in parseInternalMediaRefs(
+        copy[multimodalInternalMediaPathsKey],
+      )) {
+        final mime = mimeForInternalMediaRef(ref);
+        if (stripAudio && isAudioMime(mime)) continue;
+        if (stripImages && isImageMime(mime)) continue;
+        keptRefs.add(
+          encodeInternalMediaRef(
+            uri: ref.uri,
+            mime: ref.mime,
+            unavailable: ref.unavailable,
+          ),
+        );
+      }
+      if (keptRefs.isEmpty) {
+        copy.remove(multimodalInternalMediaPathsKey);
+      } else {
+        copy[multimodalInternalMediaPathsKey] = keptRefs;
+      }
       copy.remove(multimodalInternalRevisionIdKey);
       copy.remove(multimodalInternalDocumentPathsKey);
       copy.remove(multimodalInternalClaudeContainerKey);
       copy.remove(multimodalInternalClaudeTurnKey);
       copy.remove(kelivoContextSegmentsKey);
-      if (copy.containsKey('content')) {
+      // 内容放平是图片专用的（丢掉 markdown 图片）；只剔音频时不能放平，
+      // 否则正文里的图片部件会被误删。
+      if (stripImages && copy.containsKey('content')) {
         copy['content'] = await _stripImageInputsFromContent(copy['content']);
       }
       out.add(copy);
@@ -152,6 +191,10 @@ class ChatApiService {
 
   static bool _supportsImageInput(ProviderConfig config, String modelId) {
     return effectiveModelInfo(config, modelId).input.contains(Modality.image);
+  }
+
+  static bool _supportsAudioInput(ProviderConfig config, String modelId) {
+    return effectiveModelInfo(config, modelId).input.contains(Modality.audio);
   }
 
   /// 在凭证解析后收紧模型能力。OAuth 会重新读取完整配置，
@@ -445,8 +488,14 @@ class ChatApiService {
       final unicodeSafeMessages = _sanitizeMessages(messages);
       final stripUnsupportedImageInputs =
           !ocrActive && !_supportsImageInput(config, modelId);
-      final safeMessages = stripUnsupportedImageInputs
-          ? await _stripImageInputsFromMessages(unicodeSafeMessages)
+      final stripUnsupportedAudioInputs = !_supportsAudioInput(config, modelId);
+      final safeMessages =
+          (stripUnsupportedImageInputs || stripUnsupportedAudioInputs)
+          ? await _stripUnsupportedMediaInputsFromMessages(
+              unicodeSafeMessages,
+              stripImages: stripUnsupportedImageInputs,
+              stripAudio: stripUnsupportedAudioInputs,
+            )
           : unicodeSafeMessages;
       final safeUserImagePaths = stripUnsupportedImageInputs
           ? const <String>[]
@@ -498,8 +547,14 @@ class ChatApiService {
       final unicodeSafeMessages = _sanitizeMessages(messages);
       final stripUnsupportedImageInputs =
           !ocrActive && !_supportsImageInput(config, modelId);
-      final safeMessages = stripUnsupportedImageInputs
-          ? await _stripImageInputsFromMessages(unicodeSafeMessages)
+      final stripUnsupportedAudioInputs = !_supportsAudioInput(config, modelId);
+      final safeMessages =
+          (stripUnsupportedImageInputs || stripUnsupportedAudioInputs)
+          ? await _stripUnsupportedMediaInputsFromMessages(
+              unicodeSafeMessages,
+              stripImages: stripUnsupportedImageInputs,
+              stripAudio: stripUnsupportedAudioInputs,
+            )
           : unicodeSafeMessages;
       final safeUserImagePaths = stripUnsupportedImageInputs
           ? const <String>[]

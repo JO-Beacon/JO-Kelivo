@@ -1547,6 +1547,74 @@ void main() {
         expect(branchedTree.activeBranchId, isNot(originalBranch));
       },
     );
+    test('分叉最后一条助手回复会保留当前建议', () async {
+      final service = createService();
+      await service.init();
+
+      final source = await service.createConversation(title: 'Source');
+      await service.addMessage(
+        conversationId: source.id,
+        role: 'user',
+        content: 'question',
+      );
+      final reply = await service.addMessage(
+        conversationId: source.id,
+        role: 'assistant',
+        content: 'answer',
+      );
+      const suggestions = ['Explain more', 'Give an example'];
+      await service.updateConversationSuggestions(source.id, suggestions);
+
+      final fork = await service.createConversationForkAtRevision(
+        sourceConversationId: source.id,
+        sourceRevisionId: reply.id,
+        title: 'Fork',
+      );
+      expect(fork.chatSuggestions, suggestions);
+      expect(service.getConversation(source.id)!.chatSuggestions, suggestions);
+
+      await service.close();
+      services.remove(service);
+      final reopened = createService();
+      await reopened.init();
+      expect(reopened.getConversation(fork.id)!.chatSuggestions, suggestions);
+      await reopened.clearConversationSuggestions(fork.id);
+      expect(reopened.getConversation(fork.id)!.chatSuggestions, isEmpty);
+      expect(reopened.getConversation(source.id)!.chatSuggestions, suggestions);
+    });
+
+    test('分叉更早的消息不会继承当前建议', () async {
+      final service = createService();
+      await service.init();
+
+      final source = await service.createConversation(title: 'Source');
+      final earlier = await service.addMessage(
+        conversationId: source.id,
+        role: 'assistant',
+        content: 'earlier answer',
+      );
+      await service.addMessage(
+        conversationId: source.id,
+        role: 'user',
+        content: 'next question',
+      );
+      final latest = await service.addMessage(
+        conversationId: source.id,
+        role: 'assistant',
+        content: 'latest answer',
+      );
+      expect(latest.id, isNot(earlier.id));
+      await service.updateConversationSuggestions(source.id, const [
+        'Explain more',
+      ]);
+
+      final fork = await service.createConversationForkAtRevision(
+        sourceConversationId: source.id,
+        sourceRevisionId: earlier.id,
+        title: 'Fork',
+      );
+      expect(fork.chatSuggestions, isEmpty);
+    });
   });
 
   test('final generation commit publishes one statistics revision', () async {

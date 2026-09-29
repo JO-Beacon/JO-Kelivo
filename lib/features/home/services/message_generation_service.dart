@@ -45,7 +45,6 @@ typedef OnConversationLoadingChanged =
 typedef OnScrollToBottom = void Function();
 typedef OnShowError = void Function(String message);
 typedef OnShowWarning = void Function(String message);
-typedef OnHapticFeedback = void Function();
 
 const String conversationIdHeaderName = 'X-Conversation-Id';
 const String _conversationIdHeaderNameLower = 'x-conversation-id';
@@ -140,7 +139,6 @@ class MessageGenerationService {
   OnScrollToBottom? onScrollToBottom;
   OnShowError? onShowError;
   OnShowWarning? onShowWarning;
-  OnHapticFeedback? onHapticFeedback;
 
   /// 文件处理开始时调用，参数为所属助手消息 ID。
   void Function(String messageId)? onFileProcessingStarted;
@@ -395,7 +393,6 @@ class MessageGenerationService {
       ),
     );
   }
-
 
   Future<PreparedGeneration> prepareApiMessagesWithInjections({
     required List<ChatMessage> messages,
@@ -759,10 +756,7 @@ class MessageGenerationService {
     bool scheduledNotify = true,
     bool scheduledPreview = true,
   }) {
-    final bool ocrActive =
-        settings.ocrEnabled &&
-        settings.ocrModelProvider != null &&
-        settings.ocrModelId != null;
+    final bool ocrActive = settings.ocrActive;
 
     return stream_ctrl.GenerationContext(
       assistantMessage: assistantMessage,
@@ -818,45 +812,27 @@ class MessageGenerationService {
     return false;
   }
 
-  bool supportsAudioAttachmentsForProvider(
-    SettingsProvider settings, {
-    required String providerKey,
-    required String modelId,
-  }) {
-    return _shouldIncludeAudioForProvider(
-      settings,
-      providerKey: providerKey,
-      modelId: modelId,
-    );
-  }
-
   String _effectiveAttachmentMime(DocumentAttachment attachment) {
     return resolveDocumentAttachmentMime(attachment);
   }
 
-  bool inputContainsAudioAttachments(ChatInputData input) {
-    for (final attachment in input.documents) {
-      if (isAudioMime(_effectiveAttachmentMime(attachment))) {
-        return true;
-      }
+  /// 历史消息里模型读不了的媒体能力名，与当前输入用同一套规则。
+  List<Modality> unsupportedMediaModalitiesInApiMessages(
+    List<Map<String, dynamic>> messages,
+    ModelSpec spec, {
+    bool ocrActive = false,
+  }) {
+    final unsupported = <Modality>{};
+    for (final ref in _mediaRefsInApiMessages(messages)) {
+      final modality = gatedAttachmentModality(ref.mime);
+      if (modality == null) continue;
+      if (ocrActive && modality == Modality.image) continue;
+      if (!spec.input.contains(modality)) unsupported.add(modality);
     }
-    return false;
-  }
-
-  bool apiMessagesContainAudioAttachments(List<Map<String, dynamic>> messages) {
-    for (final message in messages) {
-      for (final ref in parseInternalMediaRefs(
-        message[MessageBuilderService.internalMediaPathsKey],
-      )) {
-        final mime = (ref.mime != null && ref.mime!.trim().isNotEmpty)
-            ? ref.mime!.trim()
-            : inferMediaMimeFromSource(ref.uri);
-        if (isAudioMime(mime)) {
-          return true;
-        }
-      }
-    }
-    return false;
+    return [
+      for (final modality in gatedAttachmentModalities)
+        if (unsupported.contains(modality)) modality,
+    ];
   }
 
   List<String> _filterMediaPathsForProvider(
@@ -883,10 +859,7 @@ class MessageGenerationService {
     required String providerKey,
     required String modelId,
   }) {
-    final bool ocrActive =
-        settings.ocrEnabled &&
-        settings.ocrModelProvider != null &&
-        settings.ocrModelId != null;
+    final bool ocrActive = settings.ocrActive;
 
     final includeAudio = _shouldIncludeAudioForProvider(
       settings,
@@ -945,4 +918,123 @@ class MessageGenerationService {
       return null;
     }
   }
+}
+
+/// 历史消息里的媒体引用，附带解析出的 MIME。
+Iterable<({String mime, String uri})> _mediaRefsInApiMessages(
+  List<Map<String, dynamic>> messages,
+) sync* {
+  for (final message in messages) {
+    for (final ref in parseInternalMediaRefs(
+      message[MessageBuilderService.internalMediaPathsKey],
+    )) {
+      final explicit = ref.mime?.trim() ?? '';
+      yield (
+        mime: explicit.isNotEmpty ? explicit : inferMediaMimeFromSource(ref.uri),
+        uri: ref.uri,
+      );
+    }
+  }
+}
+
+/// 受模型输入能力约束的附件类型；文档（含 PDF）不受约束。
+const List<Modality> gatedAttachmentModalities = [
+  Modality.image,
+  Modality.audio,
+  Modality.video,
+];
+
+/// 附件能力不足时返回的错误码前缀，后接逗号分隔的能力名。
+const String attachmentUnsupportedErrorPrefix = 'attachment_unsupported:';
+
+/// 按 MIME 归类受约束的附件；文档返回 null。
+Modality? gatedAttachmentModality(String mime) {
+  if (isImageMime(mime)) return Modality.image;
+  if (isAudioMime(mime)) return Modality.audio;
+  if (isVideoMime(mime)) return Modality.video;
+  return null;
+}
+
+/// 当前输入里模型读不了的附件类型，按固定顺序返回。
+///
+/// OCR 打开时图片不算：它们会被转成文本发出去。
+List<Modality> unsupportedInputModalities(
+  ChatInputData input,
+  ModelSpec spec, {
+  bool ocrActive = false,
+}) {
+  final unsupported = <Modality>{};
+  if (input.imagePaths.isNotEmpty && !spec.supportsImageInput && !ocrActive) {
+    unsupported.add(Modality.image);
+  }
+  for (final attachment in input.documents) {
+    final modality = gatedAttachmentModality(
+      resolveDocumentAttachmentMime(attachment),
+    );
+    if (modality == null) continue;
+    if (ocrActive && modality == Modality.image) continue;
+    if (!spec.input.contains(modality)) unsupported.add(modality);
+  }
+  return [
+    for (final modality in gatedAttachmentModalities)
+      if (unsupported.contains(modality)) modality,
+  ];
+}
+
+String attachmentUnsupportedErrorCode(Iterable<Modality> modalities) {
+  return '$attachmentUnsupportedErrorPrefix'
+      '${modalities.map((modality) => modality.name).join(',')}';
+}
+
+/// 官方 OpenAI 音频输入只接受 wav 与 mp3；其它容器由接口层拒收。
+const Set<String> officialOpenAIAudioContainers = {'wav', 'mp3'};
+
+/// 音频容器不被接口接受时返回的错误码前缀，后接逗号分隔的容器名。
+const String audioContainerUnsupportedErrorPrefix =
+    'audio_container_unsupported:';
+
+/// 本次输入里官方 OpenAI 拒收的音频容器。
+List<String> unsupportedOfficialOpenAIAudioContainers(ChatInputData input) {
+  final containers = <String>{};
+  for (final attachment in input.documents) {
+    final mime = resolveDocumentAttachmentMime(attachment);
+    if (!isAudioMime(mime)) continue;
+    final token = audioContainerToken(mime, attachment.path);
+    if (token == null || officialOpenAIAudioContainers.contains(token)) {
+      continue;
+    }
+    containers.add(token);
+  }
+  return containers.toList()..sort();
+}
+
+/// 历史消息里官方 OpenAI 拒收的音频容器。
+List<String> officialOpenAIAudioContainerConflictsInApiMessages(
+  List<Map<String, dynamic>> messages,
+) {
+  final containers = <String>{};
+  for (final ref in _mediaRefsInApiMessages(messages)) {
+    if (!isAudioMime(ref.mime)) continue;
+    final token = audioContainerToken(ref.mime, ref.uri);
+    if (token == null || officialOpenAIAudioContainers.contains(token)) {
+      continue;
+    }
+    containers.add(token);
+  }
+  return containers.toList()..sort();
+}
+
+/// 汇总附件闸门的错误码：先报模型读不了的能力，再报音频容器不被接受。
+///
+/// 返回 null 表示放行。
+String? attachmentGateError({
+  required List<Modality> unsupportedModalities,
+  required List<String> unsupportedAudioContainers,
+}) {
+  if (unsupportedModalities.isNotEmpty) {
+    return attachmentUnsupportedErrorCode(unsupportedModalities);
+  }
+  if (unsupportedAudioContainers.isEmpty) return null;
+  return '$audioContainerUnsupportedErrorPrefix'
+      '${unsupportedAudioContainers.join(',')}';
 }

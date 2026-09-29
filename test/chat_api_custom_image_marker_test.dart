@@ -7,7 +7,11 @@ import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
 import 'package:Kelivo/core/utils/multimodal_input_utils.dart';
 
-ProviderConfig _openAiConfig(String baseUrl, {bool useResponseApi = false}) {
+ProviderConfig _openAiConfig(
+  String baseUrl, {
+  bool useResponseApi = false,
+  Map<String, dynamic> modelOverrides = const {},
+}) {
   return ProviderConfig(
     id: 'OpenAITest',
     enabled: true,
@@ -16,6 +20,7 @@ ProviderConfig _openAiConfig(String baseUrl, {bool useResponseApi = false}) {
     baseUrl: baseUrl,
     providerType: ProviderKind.openai,
     useResponseApi: useResponseApi,
+    modelOverrides: modelOverrides,
   );
 }
 
@@ -927,6 +932,94 @@ void main() {
   });
 
   group('ChatApiService Responses API structured media paths', () {
+    test('声明支持音频的模型会把音频作为 input_audio 下发', () async {
+      final body = await _sendAndCaptureResponsesBody((baseUrl) async {
+        final dir = await Directory.systemTemp.createTemp('kelivo_resp_aud_');
+        addTearDown(() async {
+          if (await dir.exists()) {
+            await dir.delete(recursive: true);
+          }
+        });
+        final file = File('${dir.path}/memo.wav');
+        await file.writeAsBytes(const [1, 2, 3, 4]);
+
+        return ChatApiService.sendMessageStream(
+          config: _openAiConfig(
+            baseUrl,
+            useResponseApi: true,
+            modelOverrides: {
+              'gpt-audio': {
+                'input': ['text', 'audio'],
+              },
+            },
+          ),
+          modelId: 'gpt-audio',
+          messages: [
+            {
+              'role': 'user',
+              'content': 'listen',
+              multimodalInternalMediaPathsKey: [
+                {'uri': file.path, 'mime': 'audio/wav'},
+              ],
+            },
+          ],
+          stream: false,
+        ).toList();
+      });
+
+      final input = (body['input'] as List).cast<Map>();
+      final content = (input.single['content'] as List).cast<Map>();
+      final audio = content.firstWhere(
+        (part) => part['type'] == 'input_audio',
+        orElse: () => const <dynamic, dynamic>{},
+      );
+      expect(audio, isNotEmpty);
+      final payload = (audio['input_audio'] as Map).cast<String, dynamic>();
+      expect(payload['format'], 'wav');
+      expect(payload['data'], base64Encode(const [1, 2, 3, 4]));
+    });
+
+    test('音频载荷读不出来时不下发 input_audio，仍保留一行文本引用', () async {
+      // 模型声明支持音频、但文件读不到：这时不能把音频部件塞进去，
+      // 也不能让附件凭空消失，要退化成一行可读引用。
+      final missingPath =
+          '${Directory.systemTemp.path}/kelivo_missing_${DateTime.now().microsecondsSinceEpoch}.wav';
+      final body = await _sendAndCaptureResponsesBody((baseUrl) async {
+        return ChatApiService.sendMessageStream(
+          config: _openAiConfig(
+            baseUrl,
+            useResponseApi: true,
+            modelOverrides: {
+              'gpt-audio': {
+                'input': ['text', 'audio'],
+              },
+            },
+          ),
+          modelId: 'gpt-audio',
+          messages: [
+            {
+              'role': 'user',
+              'content': 'listen',
+              multimodalInternalMediaPathsKey: [
+                {'uri': missingPath, 'mime': 'audio/wav'},
+              ],
+            },
+          ],
+          stream: false,
+        ).toList();
+      });
+
+      expect(jsonEncode(body), isNot(contains('input_audio')));
+      final input = (body['input'] as List).cast<Map>();
+      final content = (input.single['content'] as List).cast<Map>();
+      expect(
+        content.any(
+          (part) => part['type'] == 'input_text' && part['text'] == missingPath,
+        ),
+        isTrue,
+      );
+    });
+
     test('local video/mp4 is not encoded as input_image', () async {
       final body = await _sendAndCaptureResponsesBody((baseUrl) async {
         final dir = await Directory.systemTemp.createTemp('kelivo_resp_vid_');

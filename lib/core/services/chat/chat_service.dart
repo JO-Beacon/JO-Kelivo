@@ -4392,12 +4392,22 @@ class ChatService extends ChangeNotifier {
           durationMs: message.durationMs,
         ),
     ];
+    // 只有「分叉的是最后一条已完成的助手回复」时才把建议带过去；
+    // 更早的消息、别的版本都不该继承当前的建议。
+    final suggestions =
+        targetMessage.role == 'assistant' &&
+            !targetMessage.isStreaming &&
+            activePath.isNotEmpty &&
+            activePath.last == sourceRevisionId
+        ? List<String>.of(source.chatSuggestions)
+        : const <String>[];
     final persisted = Conversation(
       title: source.title,
       assistantId: source.assistantId,
       mcpServerIds: List<String>.of(source.mcpServerIds),
       chatModelProvider: source.chatModelProvider,
       chatModelId: source.chatModelId,
+      chatSuggestions: suggestions,
     );
     final remappedMessages = [
       for (final message in targetMessages)

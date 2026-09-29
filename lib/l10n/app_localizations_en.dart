@@ -722,8 +722,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homePagePleaseSelectModel => 'Please select a model first';
 
   @override
-  String get homePageAudioAttachmentUnsupported =>
-      'The current model does not support audio attachments. Switch to a model that supports audio input or remove the audio file and try again.';
+  String homePageAttachmentUnsupported(String modalities) {
+    return 'This model does not accept $modalities attachments. Switch model or remove them.';
+  }
+
+  @override
+  String get homePageAttachmentModalityImage => 'image';
+
+  @override
+  String get homePageAttachmentModalityAudio => 'audio';
+
+  @override
+  String get homePageAttachmentModalityVideo => 'video';
+
+  @override
+  String homePageAudioContainerUnsupported(String containers) {
+    return 'This endpoint only accepts wav or mp3 audio. The attachment is $containers; convert it first.';
+  }
 
   @override
   String get homePagePleaseSetupTranslateModel =>

@@ -263,6 +263,7 @@ class HomePageController extends ChangeNotifier {
 
   // 输入栏测量
   double _inputBarHeight = 72;
+  bool _inputBarExpanded = false;
 
   // 动画调优
   static const Duration _postSwitchScrollDelay = Duration(milliseconds: 220);
@@ -520,8 +521,26 @@ class HomePageController extends ChangeNotifier {
       onStateChanged: () => notifyListeners(),
       getSettingsProvider: () => _context.read<SettingsProvider>(),
       getCurrentConversationId: () => currentConversation?.id,
-      onStreamTick: () => _scrollCtrl.autoScrollToBottomIfNeeded(),
+      onStreamTick: _handleStreamTick,
     );
+  }
+
+  /// 生成震动的最小间隔。流式回调约每 50 毫秒一次，
+  /// 每次都震会糊成一片持续抖动。
+  static const Duration _generateHapticInterval = Duration(milliseconds: 100);
+  final Stopwatch _generateHapticClock = Stopwatch();
+
+  void _handleStreamTick() {
+    _scrollCtrl.autoScrollToBottomIfNeeded();
+    if (!_context.read<SettingsProvider>().hapticsOnGenerate) return;
+    if (_generateHapticClock.isRunning &&
+        _generateHapticClock.elapsed < _generateHapticInterval) {
+      return;
+    }
+    _generateHapticClock
+      ..reset()
+      ..start();
+    Haptics.light();
   }
 
   void _initializeServices() {
@@ -656,12 +675,6 @@ class HomePageController extends ChangeNotifier {
         animate: !_chatController.isCurrentConversationLoading,
       );
     };
-    _viewModel.onHapticFeedback = () {
-      try {
-        final settings = _context.read<SettingsProvider>();
-        if (settings.hapticsOnGenerate) Haptics.light();
-      } catch (_) {}
-    };
     _viewModel.onScheduleImageSanitize =
         (messageId, content, {bool immediate = false}) {
           _scheduleInlineImageSanitize(
@@ -686,13 +699,38 @@ class HomePageController extends ChangeNotifier {
 
   String _localizeGenerationError(AppLocalizations l10n, String error) {
     switch (error) {
-      case 'audio_attachment_unsupported':
-        return l10n.homePageAudioAttachmentUnsupported;
       case 'conversation_fork_failed':
         return l10n.conversationForkFailed;
       default:
+        if (error.startsWith(attachmentUnsupportedErrorPrefix)) {
+          return _localizeAttachmentUnsupported(l10n, error);
+        }
+        // 接口不收这种音频容器：直接点名，并给出该怎么办。
+        if (error.startsWith(audioContainerUnsupportedErrorPrefix)) {
+          return l10n.homePageAudioContainerUnsupported(
+            error.substring(audioContainerUnsupportedErrorPrefix.length),
+          );
+        }
         return '${l10n.generationInterrupted}: $error';
     }
+  }
+
+  /// 附件能力不足：把能力名翻成用户能读的词，并说明附件不会被发送。
+  String _localizeAttachmentUnsupported(AppLocalizations l10n, String error) {
+    final labels = <String>[
+      for (final name
+          in error
+              .substring(attachmentUnsupportedErrorPrefix.length)
+              .split(','))
+        if (name.isNotEmpty)
+          switch (name) {
+            'image' => l10n.homePageAttachmentModalityImage,
+            'audio' => l10n.homePageAttachmentModalityAudio,
+            'video' => l10n.homePageAttachmentModalityVideo,
+            _ => name,
+          },
+    ];
+    return l10n.homePageAttachmentUnsupported(labels.join('、'));
   }
 
   void _initializeScrollController() {
@@ -2576,7 +2614,14 @@ class HomePageController extends ChangeNotifier {
     } catch (_) {}
   }
 
+  /// While the composer fills the chat area its height says nothing about
+  /// the space the message list must keep clear, so it is not measured.
+  void setInputBarExpanded(bool expanded) {
+    _inputBarExpanded = expanded;
+  }
+
   void measureInputBar() {
+    if (_inputBarExpanded) return;
     try {
       final ctx = _inputBarKey.currentContext;
       if (ctx == null) return;

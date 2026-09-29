@@ -373,21 +373,44 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
                 width: 256,
                 child: Column(
                   children: [
-                    _DesktopProvidersSearchField(
-                      controller: _searchController,
-                      hintText: l10n.providersPageSearchHint,
-                      onChanged: (value) {
-                        setState(() {
-                          _searchQuery = _normalizeSearchQuery(value);
-                        });
-                      },
-                      onClear: () {
-                        if (_searchController.text.isEmpty) return;
-                        _searchController.clear();
-                        setState(() {
-                          _searchQuery = '';
-                        });
-                      },
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _DesktopProvidersSearchField(
+                            controller: _searchController,
+                            hintText: l10n.providersPageSearchHint,
+                            onChanged: (value) {
+                              setState(() {
+                                _searchQuery = _normalizeSearchQuery(value);
+                              });
+                            },
+                            onClear: () {
+                              if (_searchController.text.isEmpty) return;
+                              _searchController.clear();
+                              setState(() {
+                                _searchQuery = '';
+                              });
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Tooltip(
+                          message: l10n.providersPageImportTooltip,
+                          child: _IconBtn(
+                            icon: lucide.Lucide.cloudDownload,
+                            onTap: () async {
+                              final keys =
+                                  await showDesktopImportProviderDialog(
+                                    context,
+                                  );
+                              if (!mounted || keys == null || keys.isEmpty) {
+                                return;
+                              }
+                              setState(() => _selectedKey = keys.first);
+                            },
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 8),
                     Expanded(
