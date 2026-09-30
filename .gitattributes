@@ -1,0 +1,21 @@
+# JO-AIClient 换行约定：文本文件一律以 LF 存库。
+#
+# 起因：在 Windows 上用脚本写文件时，若没显式声明换行，会按平台默认写成
+# CRLF。让 CRLF 进入提交后，以后每次修改这些文件，代码对比都会整份变动，
+# 真实改动被淹没。
+#
+# 新增脚本类型时注意：若将来加入 .bat / .cmd，必须为它们单独指定
+# eol=crlf，否则批处理里的 goto 标签在 LF 下可能失效（本仓库目前没有）。
+
+*.dart text eol=lf
+*.arb text eol=lf
+*.json text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.md text eol=lf
+*.sh text eol=lf
+*.ps1 text eol=lf
+
+# dependencies/ 下的第三方 fork 保持上游原样：不做换行转换，
+# 也不纳入本仓库的换行约定。
+dependencies/** -text
