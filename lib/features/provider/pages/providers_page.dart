@@ -19,6 +19,7 @@ import 'package:pretty_qr_code/pretty_qr_code.dart';
 import 'dart:ui' as ui show ImageFilter;
 import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
+import '../pages/model_catalog_page.dart';
 import '../widgets/provider_avatar.dart';
 import '../widgets/provider_group_select_sheet.dart';
 import '../../../utils/provider_grouping_logic.dart';
@@ -90,42 +91,63 @@ class _ProvidersPageState extends State<ProvidersPage> {
     );
   }
 
+  Future<void> _confirmResetProviderConfigs() async {
+    final l10n = AppLocalizations.of(context)!;
+    final settings = context.read<SettingsProvider>();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.providersPageResetConfigConfirmTitle),
+        content: Text(l10n.providersPageResetConfigConfirmContent),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l10n.providerDetailPageCancelButton),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(
+              l10n.providersPageResetConfigConfirmOk,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || confirmed != true) return;
+    await settings.resetProviderConfigs();
+    if (!mounted) return;
+    showAppSnackBar(
+      context,
+      message: l10n.providersPageResetConfigDoneSnackbar,
+      type: NotificationType.success,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
 
-    // 基础固定供应商（每次构建重新计算，使动态新增立即生效）
-    final base = _providers(l10n: l10n);
-
-    // 来自设置的动态供应商
+    // 供应商列表只看真实存在的配置；不再有“内置项”这份写死的名录。
     final settings = context.watch<SettingsProvider>();
     final cfgs = settings.providerConfigs;
-    final baseKeys = {for (final p in base) p.keyName};
-    final dynamicItems = <_Provider>[];
-    cfgs.forEach((key, cfg) {
-      if (!baseKeys.contains(key)) {
-        dynamicItems.add(
-          _Provider(
-            name: (cfg.name.isNotEmpty ? cfg.name : key),
-            keyName: key,
-            enabled: cfg.enabled,
-            modelCount: cfg.models.length,
-          ),
-        );
-      }
-    });
+    final allItems = <_Provider>[
+      for (final entry in cfgs.entries)
+        _Provider(
+          name: entry.value.name.isNotEmpty ? entry.value.name : entry.key,
+          keyName: entry.key,
+        ),
+    ];
 
-    // 合并基础供应商和动态供应商，然后应用已保存顺序
-    final merged = <_Provider>[...base, ...dynamicItems];
+    // 按已保存顺序排列，未记录在顺序中的追加到末尾
     final order = settings.providersOrder;
-    final map = {for (final p in merged) p.keyName: p};
+    final map = {for (final p in allItems) p.keyName: p};
     final tmp = <_Provider>[];
     for (final k in order) {
       final p = map.remove(k);
       if (p != null) tmp.add(p);
     }
-    // 追加未记录在顺序中的剩余供应商
     tmp.addAll(map.values);
     final items = tmp;
     final filteredItems = _applySearchToProviders(
@@ -166,11 +188,24 @@ class _ProvidersPageState extends State<ProvidersPage> {
         title: Text(l10n.providersPageTitle),
         actions: [
           Tooltip(
+            message: l10n.modelCatalogTitle,
+            child: _TactileIconButton(
+              icon: Lucide.BookOpen,
+              color: cs.onSurface,
+              size: 22,
+              onTap: () {
+                Navigator.of(context).push<void>(
+                  MaterialPageRoute<void>(builder: (_) => ModelCatalogPage()),
+                );
+              },
+            ),
+          ),
+          Tooltip(
             message: _selectMode
                 ? l10n.searchServicesPageDone
                 : l10n.providersPageMultiSelectTooltip,
             child: _TactileIconButton(
-              icon: _selectMode ? Lucide.Check : Lucide.circleDot,
+              icon: _selectMode ? Lucide.Check : Lucide.CheckSquare,
               color: cs.onSurface,
               size: 22,
               onTap: () {
@@ -212,22 +247,37 @@ class _ProvidersPageState extends State<ProvidersPage> {
         children: [
           Column(
             children: [
-              _ProvidersSearchField(
-                controller: _searchController,
-                hintText: l10n.providersPageSearchHint,
-                onChanged: (value) {
-                  setState(() {
-                    _searchQuery = _normalizeSearchQuery(value);
-                  });
-                },
-                onClear: () {
-                  if (_searchController.text.isEmpty) return;
-                  _searchController.clear();
-                  setState(() => _searchQuery = '');
-                },
-              ),
+              if (settings.providerConfigsCorrupted)
+                _ProviderConfigCorruptedRow(
+                  message: l10n.providersPageConfigCorruptedError,
+                  actionLabel: l10n.providersPageResetConfigAction,
+                  onReset: _confirmResetProviderConfigs,
+                )
+              else
+                _ProvidersSearchField(
+                  controller: _searchController,
+                  hintText: l10n.providersPageSearchHint,
+                  onChanged: (value) {
+                    setState(() {
+                      _searchQuery = _normalizeSearchQuery(value);
+                    });
+                  },
+                  onClear: () {
+                    if (_searchController.text.isEmpty) return;
+                    _searchController.clear();
+                    setState(() => _searchQuery = '');
+                  },
+                ),
               Expanded(
-                child: !groupingActive
+                child: settings.providerConfigsCorrupted
+                    ? const SizedBox.shrink()
+                    : (items.isEmpty && _searchQuery.isEmpty)
+                    ? _ProvidersEmptyState(
+                        hint: l10n.providersPageEmptyStateHint,
+                        actionLabel: l10n.providersPageEmptyStateAddAction,
+                        onAdd: _handleAddProvider,
+                      )
+                    : !groupingActive
                     ? _ProvidersList(
                         items: filteredItems,
                         selectMode: _selectMode,
@@ -428,79 +478,18 @@ class _ProvidersPageState extends State<ProvidersPage> {
               visible: _selectMode,
               count: _selected.length,
               total: visibleProviderKeys.length,
+              allSelected: _allDeletableProvidersSelected(visibleProviderKeys),
               onExport: _onExportSelected,
               onDelete: _onDeleteSelected,
               onMoveToGroup: _onMoveSelectedToGroup,
-              onSelectAll: () {
-                setState(() {
-                  // 选中所有可删除（非内置）供应商
-                  final baseKeys = {for (final p in base) p.keyName};
-                  final deletable = [
-                    for (final key in visibleProviderKeys)
-                      if (!baseKeys.contains(key)) key,
-                  ];
-                  final allSelected =
-                      deletable.isNotEmpty &&
-                      deletable.every(_selected.contains) &&
-                      _selected.length == deletable.length;
-                  _selected.removeWhere((k) => !deletable.contains(k));
-                  if (allSelected) {
-                    // 取消选中所有可删除供应商
-                    for (final k in deletable) {
-                      _selected.remove(k);
-                    }
-                  } else {
-                    // 选中所有可删除供应商
-                    _selected
-                      ..removeWhere((k) => !deletable.contains(k))
-                      ..addAll(deletable);
-                  }
-                });
-              },
+              onSelectAll: () =>
+                  _toggleSelectAllDeletableProviders(visibleProviderKeys),
             ),
           ),
         ],
       ),
     );
   }
-
-  List<_Provider> _providers({required AppLocalizations l10n}) => [
-    _p('OpenAI', 'OpenAI', enabled: true, models: 0),
-    _p(
-      l10n.providersPageSiliconFlowName,
-      'SiliconFlow',
-      enabled: true,
-      models: 0,
-    ),
-    _p('Gemini', 'Gemini', enabled: true, models: 0),
-    _p('OpenRouter', 'OpenRouter', enabled: true, models: 0),
-    _p('KelivoIN', 'KelivoIN', enabled: true, models: 0),
-    _p('Tensdaq', 'Tensdaq', enabled: false, models: 0),
-    _p('DeepSeek', 'DeepSeek', enabled: false, models: 0),
-    _p('AIhubmix', 'AIhubmix', enabled: false, models: 0),
-    _p(l10n.providersPageAliyunName, 'Aliyun', enabled: false, models: 0),
-    _p(l10n.providersPageZhipuName, 'Zhipu AI', enabled: false, models: 0),
-    _p('Claude', 'Claude', enabled: false, models: 0),
-    // _p(zh ? '腾讯混元' : 'Hunyuan', 'Hunyuan', enabled: false, models: 0),
-    // _p('InternLM', 'InternLM', enabled: true, models: 0),
-    // _p('Kimi', 'Kimi', enabled: false, models: 0),
-    _p('Grok', 'Grok', enabled: false, models: 0),
-    // _p('302.AI', '302.AI', enabled: false, models: 0),
-    // _p(zh ? '阶跃星辰' : 'StepFun', 'StepFun', enabled: false, models: 0),
-    // _p('MiniMax', 'MiniMax', enabled: true, models: 0),
-    _p(l10n.providersPageByteDanceName, 'ByteDance', enabled: false, models: 0),
-    // _p(zh ? '豆包' : 'Doubao', 'Doubao', enabled: true, models: 0),
-    // _p(zh ? '阿里云' : 'Alibaba Cloud', 'Alibaba Cloud', enabled: true, models: 0),
-    // _p('Meta', 'Meta', enabled: false, models: 0),
-    // _p('Mistral', 'Mistral', enabled: true, models: 0),
-    // _p('Perplexity', 'Perplexity', enabled: true, models: 0),
-    // _p('Cohere', 'Cohere', enabled: true, models: 0),
-    // _p('Gemma', 'Gemma', enabled: true, models: 0),
-    // _p('Cloudflare', 'Cloudflare', enabled: true, models: 0),
-    //  _p('AIHubMix', 'AIHubMix', enabled: false, models: 0),
-    // _p('Ollama', 'Ollama', enabled: true, models: 0),
-    // _p('GitHub', 'GitHub', enabled: false, models: 0),
-  ];
 
   List<_ProviderGroupingRowVM> _buildProviderGroupingRows({
     required AppLocalizations l10n,
@@ -568,14 +557,6 @@ class _ProvidersPageState extends State<ProvidersPage> {
     return rows;
   }
 
-  _Provider _p(
-    String name,
-    String key, {
-    required bool enabled,
-    required int models,
-  }) =>
-      _Provider(name: name, keyName: key, enabled: enabled, modelCount: models);
-
   List<_Provider> _applySearchToProviders({
     required List<_Provider> items,
     required SettingsProvider settings,
@@ -608,6 +589,36 @@ class _ProvidersPageState extends State<ProvidersPage> {
   }
 
   String _normalizeSearchQuery(String value) => value.trim().toLowerCase();
+
+  /// 可选中的供应商：当前可见的全部（不再有内置项例外）。
+  List<String> _deletableProviderKeys(Iterable<String> visibleKeys) =>
+      visibleKeys.toList(growable: false);
+
+  bool _allDeletableProvidersSelected(Iterable<String> visibleKeys) {
+    final deletable = _deletableProviderKeys(visibleKeys);
+    return deletable.isNotEmpty &&
+        deletable.every(_selected.contains) &&
+        _selected.length == deletable.length;
+  }
+
+  /// 全选／取消全选：作用于当前可见的全部供应商。
+  void _toggleSelectAllDeletableProviders(Iterable<String> visibleKeys) {
+    setState(() {
+      final deletable = _deletableProviderKeys(visibleKeys);
+      // 先判当前状态，再改选中集。
+      final allSelected = _allDeletableProvidersSelected(visibleKeys);
+      _selected.removeWhere((k) => !deletable.contains(k));
+      if (allSelected) {
+        for (final k in deletable) {
+          _selected.remove(k);
+        }
+      } else {
+        _selected
+          ..removeWhere((k) => !deletable.contains(k))
+          ..addAll(deletable);
+      }
+    });
+  }
 
   Future<void> _onExportSelected() async {
     if (_selected.isEmpty) return;
@@ -644,16 +655,8 @@ class _ProvidersPageState extends State<ProvidersPage> {
     final assistantProvider = context.read<AssistantProvider>();
     final settingsProvider = context.read<SettingsProvider>();
     final chatService = context.read<ChatService>();
-    // 跳过内置供应商（默认供应商）
-    final builtInKeys = {for (final p in _providers(l10n: l10n)) p.keyName};
-    final keysToDelete = _selected
-        .where((k) => !builtInKeys.contains(k))
-        .toList(growable: false);
-
-    if (keysToDelete.isEmpty) {
-      // 没有选中可删除供应商
-      return;
-    }
+    final keysToDelete = _selected.toList(growable: false);
+    if (keysToDelete.isEmpty) return;
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -1374,6 +1377,7 @@ class _SelectionBar extends StatelessWidget {
     required this.visible,
     required this.count,
     required this.total,
+    required this.allSelected,
     required this.onExport,
     required this.onDelete,
     required this.onMoveToGroup,
@@ -1382,6 +1386,7 @@ class _SelectionBar extends StatelessWidget {
   final bool visible;
   final int count;
   final int total;
+  final bool allSelected;
   final VoidCallback onExport;
   final VoidCallback onDelete;
   final VoidCallback onMoveToGroup;
@@ -1408,32 +1413,50 @@ class _SelectionBar extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    _GlassCircleButton(
-                      icon: Lucide.Trash2,
-                      color: cs.error,
-                      semanticLabel: l10n.providersPageDeleteAction,
-                      onTap: onDelete,
+                    Tooltip(
+                      message: l10n.providersPageDeleteAction,
+                      child: _GlassCircleButton(
+                        icon: Lucide.Trash2,
+                        color: cs.error,
+                        semanticLabel: l10n.providersPageDeleteAction,
+                        onTap: onDelete,
+                      ),
                     ),
                     const SizedBox(width: 14),
-                    _GlassCircleButton(
-                      icon: Lucide.checkCheck,
-                      color: cs.primary,
-                      semanticLabel: null,
-                      onTap: onSelectAll,
+                    // 全选／取消全选：图标与提示跟着当前状态变，
+                    // 与桌面供应商面板保持同一套写法。
+                    Tooltip(
+                      message: allSelected
+                          ? l10n.providersPageDeselectAllAction
+                          : l10n.providersPageSelectAllAction,
+                      child: _GlassCircleButton(
+                        icon: allSelected ? Lucide.Square : Lucide.CheckSquare,
+                        color: cs.primary,
+                        semanticLabel: allSelected
+                            ? l10n.providersPageDeselectAllAction
+                            : l10n.providersPageSelectAllAction,
+                        onTap: onSelectAll,
+                      ),
                     ),
                     const SizedBox(width: 14),
-                    _GlassCircleButton(
-                      icon: Lucide.Folder,
-                      color: cs.primary,
-                      semanticLabel: l10n.providerGroupsPickerTitle,
-                      onTap: onMoveToGroup,
+                    Tooltip(
+                      message: l10n.providersPageMoveToGroupAction,
+                      child: _GlassCircleButton(
+                        icon: Lucide.Folder,
+                        color: cs.primary,
+                        semanticLabel: l10n.providersPageMoveToGroupAction,
+                        onTap: onMoveToGroup,
+                      ),
                     ),
                     const SizedBox(width: 14),
-                    _GlassCircleButton(
-                      icon: Lucide.Share2,
-                      color: cs.primary,
-                      semanticLabel: l10n.providersPageExportAction,
-                      onTap: onExport,
+                    Tooltip(
+                      message: l10n.providersPageExportAction,
+                      child: _GlassCircleButton(
+                        icon: Lucide.Share2,
+                        color: cs.primary,
+                        semanticLabel: l10n.providersPageExportAction,
+                        onTap: onExport,
+                      ),
                     ),
                   ],
                 ),
@@ -1730,14 +1753,7 @@ class _Pill extends StatelessWidget {
 class _Provider {
   final String name;
   final String keyName;
-  final bool enabled;
-  final int modelCount;
-  _Provider({
-    required this.name,
-    required this.keyName,
-    required this.enabled,
-    required this.modelCount,
-  });
+  const _Provider({required this.name, required this.keyName});
 }
 
 // AppBar 的纯图标触感按钮：无涟漪，按下缩放并变色，无触感
@@ -1872,4 +1888,119 @@ Widget _iosDivider(BuildContext context) {
     endIndent: 12,
     color: cs.outlineVariant.withValues(alpha: 0.18),
   );
+}
+
+// 供应商配置损坏时的错误行：列表顶部提示 + 显式重置入口。
+class _ProviderConfigCorruptedRow extends StatelessWidget {
+  const _ProviderConfigCorruptedRow({
+    required this.message,
+    required this.actionLabel,
+    required this.onReset,
+  });
+
+  final String message;
+  final String actionLabel;
+  final VoidCallback onReset;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: cs.error.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: cs.error.withValues(alpha: 0.35)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Lucide.TriangleAlert, size: 18, color: cs.error),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    message,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: cs.onSurface.withValues(alpha: 0.85),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerRight,
+              child: IosTileButton(
+                label: actionLabel,
+                icon: Lucide.RotateCcw,
+                onTap: onReset,
+                fontSize: 13,
+                backgroundColor: cs.error,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// 列表为空时的引导：一句说明 + 添加供应商入口。
+class _ProvidersEmptyState extends StatelessWidget {
+  const _ProvidersEmptyState({
+    required this.hint,
+    required this.actionLabel,
+    required this.onAdd,
+  });
+
+  final String hint;
+  final String actionLabel;
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Lucide.Plus,
+              size: 32,
+              color: cs.onSurface.withValues(alpha: 0.35),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              hint,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: cs.onSurface.withValues(alpha: 0.7),
+              ),
+            ),
+            const SizedBox(height: 16),
+            IosTileButton(
+              label: actionLabel,
+              icon: Lucide.Plus,
+              onTap: onAdd,
+              backgroundColor: cs.primary,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

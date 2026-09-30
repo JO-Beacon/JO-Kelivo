@@ -1792,7 +1792,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String contextTreeMigrationWarningsContent(int count) {
-    return 'JO-AIClient 在转换旧版对话分支时修复了 $count 条缺失的选中版本记录。修复结果已写入警告日志，未读取或修改消息正文。';
+    return 'JO-AIClient 在转换旧版对话分支时修复了 $count 条缺失的选中分支记录。修复结果已写入警告日志，未读取或修改消息正文。';
   }
 
   @override
@@ -2652,7 +2652,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatMessageWidgetRegenerateConfirmContent =>
-      '重新生成只会更新当前消息，不会删除下面的消息。确定要继续吗？';
+      '重新生成会新建一条分支，原来的回复会保留，下面的消息不会被删除。确定要继续吗？';
 
   @override
   String get chatMessageWidgetRegenerateConfirmInterruptNotice =>
@@ -4020,7 +4020,38 @@ class AppLocalizationsZh extends AppLocalizations {
   String get providersPageAddTooltip => '新增';
 
   @override
+  String get providerAddSheetPresetsTab => '预设';
+
+  @override
+  String get providerAddSheetPresetsHint => '选择厂商会自动填好名称与接口地址，之后仍可修改。';
+
+  @override
   String get providersPageSearchHint => '搜索供应商或分组';
+
+  @override
+  String get providersPageEmptyStateHint => '还没有供应商，先添加一个。';
+
+  @override
+  String get providersPageEmptyStateAddAction => '添加供应商';
+
+  @override
+  String get providersPageConfigCorruptedError => '供应商配置读取失败。为避免覆盖原始数据，已锁定编辑。';
+
+  @override
+  String get providersPageResetConfigAction => '重置供应商配置';
+
+  @override
+  String get providersPageResetConfigConfirmTitle => '重置供应商配置？';
+
+  @override
+  String get providersPageResetConfigConfirmContent =>
+      '这会清空全部供应商配置、顺序与分组，原始数据无法自动恢复。';
+
+  @override
+  String get providersPageResetConfigConfirmOk => '重置';
+
+  @override
+  String get providersPageResetConfigDoneSnackbar => '已重置供应商配置';
 
   @override
   String get providersPageProviderAddedSnackbar => '已添加供应商';
@@ -6136,6 +6167,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get providersPageExportAction => '导出';
 
   @override
+  String get providersPageSelectAllAction => '全选';
+
+  @override
+  String get providersPageDeselectAllAction => '取消全选';
+
+  @override
+  String get providersPageMoveToGroupAction => '移动到分组';
+
+  @override
   String get assistantEditPresetTitle => '预设对话信息';
 
   @override
@@ -8543,7 +8583,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get messageEditDeletePartConfirmTitle => '删除这个部件？';
 
   @override
-  String get messageEditDeletePartConfirmMessage => '此操作只影响当前编辑后的消息版本。';
+  String get messageEditDeletePartConfirmMessage => '此操作只影响当前编辑后的分支。';
 
   @override
   String get messageEditCancel => '取消';
@@ -9580,15 +9620,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get modelSelectSheetFollowAssistant => '跟随助手';
 
   @override
-  String get displaySettingsPageForkKeepMessageVersionsTitle => '创建分支时保留消息版本';
-
-  @override
   String get displaySettingsPageEditAssistantKeepThinkingToolCardsTitle =>
       '编辑助手时保留思考与工具卡片';
 
   @override
   String get displaySettingsPageEditAssistantKeepThinkingToolCardsSubtitle =>
-      '关闭后，当前编辑版本只保留助手正文；切回上一版本仍可查看思考与工具卡片';
+      '关闭后，当前编辑分支只保留助手正文；切回上一分支仍可查看思考与工具卡片';
 
   @override
   String get themeAdvancedSettingsPageTitle => '主题高级设置';
@@ -12224,10 +12261,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mcpServerEditSheetHttpUrlHint => 'http://localhost:3000';
 
   @override
-  String get chatMessageWidgetRegenerateConfirmDeleteTrailingContent =>
-      '重新生成将会删除此消息下面的所有消息，且无法撤销。确定要继续吗？';
-
-  @override
   String get aboutPageEasterEggMessage => '\n（好吧现在还没彩蛋）';
 
   @override
@@ -12238,10 +12271,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get aboutPageKelivoSearchAlreadyUnlocked => '这扇门你已经推开过了。';
-
-  @override
-  String get displaySettingsPageRegenerateDeleteTrailingMessagesTitle =>
-      '重新生成时删除下面的消息';
 
   @override
   String get searchServiceNameKimi => 'Kimi';
@@ -12367,7 +12396,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get scheduledTasksContextPolicyTip =>
-      '跟随最新对话：发送新消息、编辑消息或切换消息版本后，已准备内容会失效；重新准备会占用次数，并可能增加费用。\n\n使用准备时的快照：对话变化后仍保留已准备结果，内容不会包含后续聊天。';
+      '跟随最新对话：发送新消息、编辑消息或切换分支后，已准备内容会失效；重新准备会占用次数，并可能增加费用。\n\n使用准备时的快照：对话变化后仍保留已准备结果，内容不会包含后续聊天。';
 
   @override
   String get scheduledTasksPreparationWindowTip =>
@@ -13075,6 +13104,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get modelCatalogAutoUpdate => '每 24 小时自动更新';
+
+  @override
+  String get modelCatalogUpdateManual => '仅手动更新';
 
   @override
   String get modelCatalogRefresh => '立即更新';
@@ -14935,7 +14967,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String contextTreeMigrationWarningsContent(int count) {
-    return 'JO-AIClient 在转换旧版对话分支时修复了 $count 条缺失的选中版本记录。修复结果已写入警告日志，未读取或修改消息正文。';
+    return 'JO-AIClient 在转换旧版对话分支时修复了 $count 条缺失的选中分支记录。修复结果已写入警告日志，未读取或修改消息正文。';
   }
 
   @override
@@ -15795,7 +15827,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get chatMessageWidgetRegenerateConfirmContent =>
-      '重新生成只会更新当前消息，不会删除下面的消息。确定要继续吗？';
+      '重新生成会新建一条分支，原来的回复会保留，下面的消息不会被删除。确定要继续吗？';
 
   @override
   String get chatMessageWidgetRegenerateConfirmInterruptNotice =>
@@ -17163,7 +17195,38 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get providersPageAddTooltip => '新增';
 
   @override
+  String get providerAddSheetPresetsTab => '预设';
+
+  @override
+  String get providerAddSheetPresetsHint => '选择厂商会自动填好名称与接口地址，之后仍可修改。';
+
+  @override
   String get providersPageSearchHint => '搜索供应商或分组';
+
+  @override
+  String get providersPageEmptyStateHint => '还没有供应商，先添加一个。';
+
+  @override
+  String get providersPageEmptyStateAddAction => '添加供应商';
+
+  @override
+  String get providersPageConfigCorruptedError => '供应商配置读取失败。为避免覆盖原始数据，已锁定编辑。';
+
+  @override
+  String get providersPageResetConfigAction => '重置供应商配置';
+
+  @override
+  String get providersPageResetConfigConfirmTitle => '重置供应商配置？';
+
+  @override
+  String get providersPageResetConfigConfirmContent =>
+      '这会清空全部供应商配置、顺序与分组，原始数据无法自动恢复。';
+
+  @override
+  String get providersPageResetConfigConfirmOk => '重置';
+
+  @override
+  String get providersPageResetConfigDoneSnackbar => '已重置供应商配置';
 
   @override
   String get providersPageProviderAddedSnackbar => '已添加供应商';
@@ -19279,6 +19342,15 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get providersPageExportAction => '导出';
 
   @override
+  String get providersPageSelectAllAction => '全选';
+
+  @override
+  String get providersPageDeselectAllAction => '取消全选';
+
+  @override
+  String get providersPageMoveToGroupAction => '移动到分组';
+
+  @override
   String get assistantEditPresetTitle => '预设对话信息';
 
   @override
@@ -21686,7 +21758,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get messageEditDeletePartConfirmTitle => '删除这个部件？';
 
   @override
-  String get messageEditDeletePartConfirmMessage => '此操作只影响当前编辑后的消息版本。';
+  String get messageEditDeletePartConfirmMessage => '此操作只影响当前编辑后的分支。';
 
   @override
   String get messageEditCancel => '取消';
@@ -22723,15 +22795,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get modelSelectSheetFollowAssistant => '跟随助手';
 
   @override
-  String get displaySettingsPageForkKeepMessageVersionsTitle => '创建分支时保留消息版本';
-
-  @override
   String get displaySettingsPageEditAssistantKeepThinkingToolCardsTitle =>
       '编辑助手时保留思考与工具卡片';
 
   @override
   String get displaySettingsPageEditAssistantKeepThinkingToolCardsSubtitle =>
-      '关闭后，当前编辑版本只保留助手正文；切回上一版本仍可查看思考与工具卡片';
+      '关闭后，当前编辑分支只保留助手正文；切回上一分支仍可查看思考与工具卡片';
 
   @override
   String get themeAdvancedSettingsPageTitle => '主题高级设置';
@@ -25367,10 +25436,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get mcpServerEditSheetHttpUrlHint => 'http://localhost:3000';
 
   @override
-  String get chatMessageWidgetRegenerateConfirmDeleteTrailingContent =>
-      '重新生成将会删除此消息下面的所有消息，且无法撤销。确定要继续吗？';
-
-  @override
   String get aboutPageEasterEggMessage => '\n（好吧现在还没彩蛋）';
 
   @override
@@ -25381,10 +25446,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get aboutPageKelivoSearchAlreadyUnlocked => '这扇门你已经推开过了。';
-
-  @override
-  String get displaySettingsPageRegenerateDeleteTrailingMessagesTitle =>
-      '重新生成时删除下面的消息';
 
   @override
   String get searchServiceNameKimi => 'Kimi';
@@ -25510,7 +25571,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get scheduledTasksContextPolicyTip =>
-      '跟随最新对话：发送新消息、编辑消息或切换消息版本后，已准备内容会失效；重新准备会占用次数，并可能增加费用。\n\n使用准备时的快照：对话变化后仍保留已准备结果，内容不会包含后续聊天。';
+      '跟随最新对话：发送新消息、编辑消息或切换分支后，已准备内容会失效；重新准备会占用次数，并可能增加费用。\n\n使用准备时的快照：对话变化后仍保留已准备结果，内容不会包含后续聊天。';
 
   @override
   String get scheduledTasksPreparationWindowTip =>
@@ -26218,6 +26279,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get modelCatalogAutoUpdate => '每 24 小时自动更新';
+
+  @override
+  String get modelCatalogUpdateManual => '仅手动更新';
 
   @override
   String get modelCatalogRefresh => '立即更新';
@@ -28079,7 +28143,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String contextTreeMigrationWarningsContent(int count) {
-    return 'JO-AIClient 在轉換舊版對話分支時修復了 $count 筆遺失的選取版本記錄。修復結果已寫入警告記錄，未讀取或修改訊息正文。';
+    return 'JO-AIClient 在轉換舊版對話分支時修復了 $count 筆遺失的選取分支記錄。修復結果已寫入警告記錄，未讀取或修改訊息正文。';
   }
 
   @override
@@ -28938,7 +29002,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get chatMessageWidgetRegenerateConfirmContent =>
-      '重新生成只會更新目前訊息，不會刪除下面的訊息。確定要繼續嗎？';
+      '重新生成會建立一條分支，原本的回覆會保留，下面的訊息不會被刪除。確定要繼續嗎？';
 
   @override
   String get chatMessageWidgetRegenerateConfirmInterruptNotice =>
@@ -30306,7 +30370,38 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get providersPageAddTooltip => '新增';
 
   @override
+  String get providerAddSheetPresetsTab => '預設';
+
+  @override
+  String get providerAddSheetPresetsHint => '選擇廠商會自動填好名稱與介面位址，之後仍可修改。';
+
+  @override
   String get providersPageSearchHint => '搜尋供應商或分組';
+
+  @override
+  String get providersPageEmptyStateHint => '還沒有供應商，先新增一個。';
+
+  @override
+  String get providersPageEmptyStateAddAction => '新增供應商';
+
+  @override
+  String get providersPageConfigCorruptedError => '供應商設定讀取失敗。為避免覆蓋原始資料，已鎖定編輯。';
+
+  @override
+  String get providersPageResetConfigAction => '重設供應商設定';
+
+  @override
+  String get providersPageResetConfigConfirmTitle => '重設供應商設定？';
+
+  @override
+  String get providersPageResetConfigConfirmContent =>
+      '這會清空全部供應商設定、順序與分組，原始資料無法自動恢復。';
+
+  @override
+  String get providersPageResetConfigConfirmOk => '重設';
+
+  @override
+  String get providersPageResetConfigDoneSnackbar => '已重設供應商設定';
 
   @override
   String get providersPageProviderAddedSnackbar => '已新增供應商';
@@ -32422,6 +32517,15 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get providersPageExportAction => '匯出';
+
+  @override
+  String get providersPageSelectAllAction => '全選';
+
+  @override
+  String get providersPageDeselectAllAction => '取消全選';
+
+  @override
+  String get providersPageMoveToGroupAction => '移動到分組';
 
   @override
   String get assistantEditPresetTitle => '預設對話訊息';
@@ -34831,7 +34935,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get messageEditDeletePartConfirmTitle => '刪除這個部件？';
 
   @override
-  String get messageEditDeletePartConfirmMessage => '此操作只影響目前編輯後的訊息版本。';
+  String get messageEditDeletePartConfirmMessage => '此操作只影響目前編輯後的分支。';
 
   @override
   String get messageEditCancel => '取消';
@@ -35868,15 +35972,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get modelSelectSheetFollowAssistant => '跟隨助手';
 
   @override
-  String get displaySettingsPageForkKeepMessageVersionsTitle => '建立分支時保留訊息版本';
-
-  @override
   String get displaySettingsPageEditAssistantKeepThinkingToolCardsTitle =>
       '編輯助手時保留思考與工具卡片';
 
   @override
   String get displaySettingsPageEditAssistantKeepThinkingToolCardsSubtitle =>
-      '關閉後，目前編輯版本只保留助手正文；切回上一版本仍可查看思考與工具卡片';
+      '關閉後，目前編輯分支只保留助手正文；切回上一分支仍可查看思考與工具卡片';
 
   @override
   String get themeAdvancedSettingsPageTitle => '主題進階設定';
@@ -38516,10 +38617,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get mcpServerEditSheetHttpUrlHint => 'http://localhost:3000';
 
   @override
-  String get chatMessageWidgetRegenerateConfirmDeleteTrailingContent =>
-      '重新生成將會刪除此訊息下面的所有訊息，且無法復原。確定要繼續嗎？';
-
-  @override
   String get aboutPageEasterEggMessage => '\n（好吧現在還沒彩蛋）';
 
   @override
@@ -38530,10 +38627,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get aboutPageKelivoSearchAlreadyUnlocked => '這扇門你已經推開過了。';
-
-  @override
-  String get displaySettingsPageRegenerateDeleteTrailingMessagesTitle =>
-      '重新生成時刪除下面的訊息';
 
   @override
   String get searchServiceNameKimi => 'Kimi';
@@ -38659,7 +38752,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get scheduledTasksContextPolicyTip =>
-      '跟隨最新對話：傳送新訊息、編輯訊息或切換訊息版本後，已準備內容會失效；重新準備會占用次數，並可能增加費用。\n\n使用準備時的快照：對話變化後仍保留已準備結果，內容不會包含後續聊天。';
+      '跟隨最新對話：傳送新訊息、編輯訊息或切換分支後，已準備內容會失效；重新準備會占用次數，並可能增加費用。\n\n使用準備時的快照：對話變化後仍保留已準備結果，內容不會包含後續聊天。';
 
   @override
   String get scheduledTasksPreparationWindowTip =>
@@ -39367,6 +39460,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get modelCatalogAutoUpdate => '每 24 小時自動更新';
+
+  @override
+  String get modelCatalogUpdateManual => '僅手動更新';
 
   @override
   String get modelCatalogRefresh => '立即更新';

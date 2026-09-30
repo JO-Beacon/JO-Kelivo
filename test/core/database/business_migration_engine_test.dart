@@ -98,6 +98,29 @@ void main() {
     },
   );
 
+  test('设备本机键不会被迁移清理删掉', () async {
+    // 模型目录的更新方式是本机偏好，必须留在 localOnly；
+    // 否则它会被归为 unknownPreference，在启动清理里被删除，
+    // 表现成「设置改完下次启动就复原」。
+    final legacy = FakeLegacyBusinessPreferences({
+      'theme_mode_v1': 'dark',
+      'model_catalog_update_mode_v1': 'daily',
+    });
+
+    await BusinessMigrationEngine(
+      repository: repository,
+      legacyPreferences: legacy,
+    ).run();
+
+    // 业务键照常被清掉，本机键必须留下。
+    expect(legacy.values.containsKey('theme_mode_v1'), isFalse);
+    expect(legacy.values['model_catalog_update_mode_v1'], 'daily');
+    expect(
+      BusinessKeyRegistry.classify('model_catalog_update_mode_v1'),
+      BusinessKeyDisposition.localOnly,
+    );
+  });
+
   for (final retiredValue in <Object?>[true, 'invalid-retired-value']) {
     test(
       'retired user-image placement value $retiredValue remains inert',

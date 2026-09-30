@@ -79,24 +79,6 @@ class SettingsProvider extends ChangeNotifier {
   static const String _providerUngroupedPositionKey =
       'provider_ungrouped_position_v1'; // 分组之间的显示索引
   static const String providerUngroupedGroupKey = '__ungrouped__';
-  static const List<String> _builtInProviderKeysInOrder = [
-    'OpenAI',
-    'SiliconFlow',
-    'Gemini',
-    'OpenRouter',
-    'KelivoIN',
-    'Tensdaq',
-    'DeepSeek',
-    'AIhubmix',
-    'Aliyun',
-    'Zhipu AI',
-    'Claude',
-    'Grok',
-    'ByteDance',
-  ];
-  static const Set<String> _builtInProviderKeys = {
-    ..._builtInProviderKeysInOrder,
-  };
   static const String _themeModeKey = 'theme_mode_v1';
   static const String _providerConfigsKey = 'provider_configs_v1';
   static const String _pinnedModelsKey = 'pinned_models_v1';
@@ -214,8 +196,6 @@ class SettingsProvider extends ChangeNotifier {
       'display_show_tool_result_summary_v1';
   static const String _displayHideToolResultImagesKey =
       'display_hide_tool_result_images_v1';
-  static const String _displayRegenerateDeleteTrailingMessagesKey =
-      'display_regenerate_delete_trailing_messages_v1';
   static const String _displayShowRegenerateConfirmDialogKey =
       'display_show_regenerate_confirm_dialog_v1';
   static const String _displayShowMessageNavKey = 'display_show_message_nav_v1';
@@ -549,6 +529,11 @@ class SettingsProvider extends ChangeNotifier {
   Map<String, ProviderConfig> _providerConfigs = {};
   Map<String, ProviderConfig> get providerConfigs =>
       Map.unmodifiable(_providerConfigs);
+
+  // 配置解析失败（例如 JSON 损坏）时的写锁状态。只存在于内存：原始字符串
+  // 保留不覆盖，重新加载时会再次判定为损坏。
+  bool _providerConfigsCorrupted = false;
+  bool get providerConfigsCorrupted => _providerConfigsCorrupted;
   bool get hasAnyActiveModel =>
       _providerConfigs.values.any((c) => c.enabled && c.models.isNotEmpty);
   // 在缺少配置时为给定键返回配置，而不改变内部状态。
@@ -570,16 +555,6 @@ class SettingsProvider extends ChangeNotifier {
     final rawOv = cfg.modelOverrides[modelId];
     final ov = rawOv is Map ? rawOv.cast<String, dynamic>() : null;
     return resolveApiModelIdOverride(ov, modelId);
-  }
-
-  // 显式确保内存中存在一个提供者配置（不持久化到存储）。
-  // 用于初始化首次运行的默认值。
-  ProviderConfig ensureProviderConfig(String key, {String? defaultName}) {
-    final existed = _providerConfigs[key];
-    if (existed != null) return existed;
-    final cfg = ProviderConfig.defaultsFor(key, displayName: defaultName);
-    _providerConfigs[key] = cfg;
-    return cfg;
   }
 
   // 搜索服务设置
@@ -662,11 +637,11 @@ class SettingsProvider extends ChangeNotifier {
               MapEntry(k, ProviderConfig.fromJson(v as Map<String, dynamic>)),
         );
       } catch (e, st) {
-        assert(() {
-          debugPrint('[SettingsProvider] providerConfigs decode failed: $e');
-          debugPrint('$st');
-          return true;
-        }());
+        // 解析失败：保留原始字符串不覆盖，并进入写锁状态。
+        // 不能只写在 assert 里，否则 release 下完全静默。
+        _providerConfigsCorrupted = true;
+        debugPrint('[SettingsProvider] providerConfigs decode failed: $e');
+        debugPrint('$st');
       }
     }
 
@@ -1001,8 +976,6 @@ class SettingsProvider extends ChangeNotifier {
         prefs.getBool(_displayShowToolResultSummaryKey) ?? false;
     _hideToolResultImages =
         prefs.getBool(_displayHideToolResultImagesKey) ?? false;
-    _regenerateDeleteTrailingMessages =
-        prefs.getBool(_displayRegenerateDeleteTrailingMessagesKey) ?? false;
     _showRegenerateConfirmDialog =
         prefs.getBool(_displayShowRegenerateConfirmDialogKey) ?? true;
     _showMessageNavButtons = prefs.getBool(_displayShowMessageNavKey) ?? true;
@@ -1454,19 +1427,6 @@ class SettingsProvider extends ChangeNotifier {
         );
       } catch (_) {}
     }
-    if (_providerConfigs.isEmpty) {
-      // 首次启动时写入少量合理默认值，但后续读取（例如切换聊天时）
-      // 不隐式重建提供方。
-      ensureProviderConfig('KelivoIN', defaultName: 'KelivoIN');
-      ensureProviderConfig('Tensdaq', defaultName: 'Tensdaq');
-      ensureProviderConfig('SiliconFlow', defaultName: 'SiliconFlow');
-      ensureProviderConfig('AIhubmix', defaultName: 'AIhubmix');
-      final seededConfigs = _providerConfigs.map(
-        (key, config) => MapEntry(key, config.toJson()),
-      );
-      await prefs.setString(_providerConfigsKey, jsonEncode(seededConfigs));
-    }
-
     // 为服务启动一次连接性检测（排除本地 Bing）
     if (_searchAutoTestOnLaunch) {
       _initSearchConnectivityTests();
@@ -2219,31 +2179,15 @@ class SettingsProvider extends ChangeNotifier {
   }
 
   Future<void> setProvidersOrder(List<String> order) async {
-    var seededBuiltIn = false;
-    for (final key in order) {
-      if (_builtInProviderKeys.contains(key) &&
-          !_providerConfigs.containsKey(key)) {
-        ensureProviderConfig(key, defaultName: key);
-        seededBuiltIn = true;
-      }
-    }
+    if (_refuseProviderConfigWrite('setProvidersOrder')) return;
     _providersOrder = List.unmodifiable(order);
     _cleanupProviderOrderAndGrouping();
     notifyListeners();
     final prefs = _preferences;
-    if (seededBuiltIn) {
-      final configs = _providerConfigs.map(
-        (key, config) => MapEntry(key, config.toJson()),
-      );
-      await prefs.setString(_providerConfigsKey, jsonEncode(configs));
-    }
     await prefs.setStringList(_providersOrderKey, _providersOrder);
   }
 
-  Set<String> _knownProviderKeys() => <String>{
-    ..._builtInProviderKeys,
-    ..._providerConfigs.keys,
-  };
+  Set<String> _knownProviderKeys() => <String>{..._providerConfigs.keys};
 
   bool _cleanupProviderOrderAndGrouping() {
     bool changed = false;
@@ -2263,10 +2207,7 @@ class SettingsProvider extends ChangeNotifier {
       }
       nextOrder.add(k);
     }
-    final mergedDefault = <String>[
-      ..._builtInProviderKeysInOrder,
-      ..._providerConfigs.keys.where((k) => !_builtInProviderKeys.contains(k)),
-    ];
+    final mergedDefault = <String>[..._providerConfigs.keys];
     for (final k in mergedDefault) {
       if (knownKeys.contains(k) && seen.add(k)) {
         nextOrder.add(k);
@@ -3040,11 +2981,42 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> followSystem() => setThemeMode(ThemeMode.system);
 
   Future<void> setProviderConfig(String key, ProviderConfig config) async {
+    if (_refuseProviderConfigWrite('setProviderConfig')) return;
     _providerConfigs[key] = config;
     notifyListeners();
     final prefs = _preferences;
     final map = _providerConfigs.map((k, v) => MapEntry(k, v.toJson()));
     await prefs.setString(_providerConfigsKey, jsonEncode(map));
+  }
+
+  // 损坏状态下的写锁：整表写入一律拒绝，避免覆盖用户原始 API key。
+  bool _refuseProviderConfigWrite(String source) {
+    if (!_providerConfigsCorrupted) return false;
+    debugPrint(
+      '[SettingsProvider] $source refused: provider configs corrupted',
+    );
+    return true;
+  }
+
+  /// 显式重置供应商配置（用户确认后调用）。
+  ///
+  /// 这是损坏状态下唯一允许覆盖 `_providerConfigsKey` 的入口：清空配置、
+  /// 顺序与分组，解除写锁并正常写回。
+  Future<void> resetProviderConfigs() async {
+    _providerConfigs = <String, ProviderConfig>{};
+    _providersOrder = const <String>[];
+    _providerGroups = const <ProviderGroup>[];
+    _providerGroupMap = <String, String>{};
+    _providerGroupCollapsed.clear();
+    _providerUngroupedPosition = 0;
+    _providerConfigsCorrupted = false;
+    final prefs = _preferences;
+    // 损坏数据可能以偏好行形式遮蔽实体数据，必须先删除该行，
+    // 否则重启后损坏状态会复原。
+    await prefs.removeStoredPreference(_providerConfigsKey);
+    await prefs.setString(_providerConfigsKey, jsonEncode(<String, dynamic>{}));
+    await _persistProviderGrouping(prefs);
+    notifyListeners();
   }
 
   Future<int> deleteModels(String providerKey, Set<String> modelIds) async {
@@ -3339,6 +3311,7 @@ class SettingsProvider extends ChangeNotifier {
   }
 
   Future<void> removeProviderConfig(String key) async {
+    if (_refuseProviderConfigWrite('removeProviderConfig')) return;
     if (!_providerConfigs.containsKey(key)) return;
     _providerConfigs.remove(key);
     // 从排序中移除
@@ -4696,17 +4669,6 @@ Requirements:
     await _preferences.setBool(_displayHideToolResultImagesKey, v);
   }
 
-  bool _regenerateDeleteTrailingMessages = false;
-  bool get regenerateDeleteTrailingMessages =>
-      _regenerateDeleteTrailingMessages;
-  Future<void> setRegenerateDeleteTrailingMessages(bool v) async {
-    if (_regenerateDeleteTrailingMessages == v) return;
-    _regenerateDeleteTrailingMessages = v;
-    notifyListeners();
-    final prefs = _preferences;
-    await prefs.setBool(_displayRegenerateDeleteTrailingMessagesKey, v);
-  }
-
   bool _showRegenerateConfirmDialog = true;
   bool get showRegenerateConfirmDialog => _showRegenerateConfirmDialog;
   Future<void> setShowRegenerateConfirmDialog(bool v) async {
@@ -5755,7 +5717,6 @@ Requirements:
     copy._collapseThinkingSteps = _collapseThinkingSteps;
     copy._showToolResultSummary = _showToolResultSummary;
     copy._hideToolResultImages = _hideToolResultImages;
-    copy._regenerateDeleteTrailingMessages = _regenerateDeleteTrailingMessages;
     copy._showRegenerateConfirmDialog = _showRegenerateConfirmDialog;
     copy._showMessageNavButtons = _showMessageNavButtons;
     copy._mobileMessageNavButtonsMode = _mobileMessageNavButtonsMode;

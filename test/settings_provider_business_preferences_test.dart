@@ -80,12 +80,14 @@ void main() {
     expect(settings.getProviderConfig('SiliconFlow').models, isEmpty);
   });
 
-  test('fresh built-in provider reordering survives a cold reload', () async {
+  test('provider reordering survives a cold reload', () async {
     final settings = SettingsProvider(BusinessPreferences(repository));
     await settings.loaded;
 
-    // These built-ins are intentionally not part of the first-run persisted
-    // provider-config seed. Their row order must still survive a restart.
+    // 只有真实存在的配置才会进入顺序表。
+    for (final key in <String>['Gemini', 'OpenAI']) {
+      await settings.setProviderConfig(key, settings.getProviderConfig(key));
+    }
     await settings.setProvidersOrder(<String>['Gemini', 'OpenAI']);
     expect(settings.providersOrder.take(2), <String>['Gemini', 'OpenAI']);
 
@@ -95,41 +97,39 @@ void main() {
     expect(reloaded.providersOrder.take(2), <String>['Gemini', 'OpenAI']);
   });
 
-  test(
-    'migrated order-only provider state survives startup seeding and reload',
-    () async {
-      const legacyOrder = <String>[
-        'Gemini',
-        'OpenAI',
-        'SiliconFlow',
-        'OpenRouter',
-        'KelivoIN',
-        'Tensdaq',
-        'DeepSeek',
-        'AIhubmix',
-        'Aliyun',
-        'Zhipu AI',
-        'Claude',
-        'Grok',
-        'ByteDance',
-      ];
-      const persistedOrder = <String>[...legacyOrder, '随想AI中转站'];
-      await repository.replaceSnapshot(
-        BusinessSettingsRouter.normalizeAndRoute({
-          'providers_order_v1': persistedOrder,
-        }),
-      );
+  test('order-only provider state no longer resurrects providers', () async {
+    // 没有配置的顺序项一律丢弃：不再有“内置供应商”这个概念，
+    // 启动时也不会再把它们实体化出来。
+    const legacyOrder = <String>[
+      'Gemini',
+      'OpenAI',
+      'SiliconFlow',
+      'OpenRouter',
+      'KelivoIN',
+      'Tensdaq',
+      'DeepSeek',
+      'AIhubmix',
+      'Aliyun',
+      'Zhipu AI',
+      'Claude',
+      'Grok',
+      'ByteDance',
+    ];
+    await repository.replaceSnapshot(
+      BusinessSettingsRouter.normalizeAndRoute(<String, Object?>{
+        'providers_order_v1': <String>[...legacyOrder, '随想AI中转站'],
+      }),
+    );
 
-      final settings = SettingsProvider(BusinessPreferences(repository));
-      await settings.loaded;
-      expect(settings.providersOrder, legacyOrder);
-      expect(settings.providersOrder, isNot(contains('随想AI中转站')));
+    final settings = SettingsProvider(BusinessPreferences(repository));
+    await settings.loaded;
+    expect(settings.providersOrder, isEmpty);
+    expect(settings.providerConfigs, isEmpty);
 
-      final reloaded = SettingsProvider(BusinessPreferences(repository));
-      await reloaded.loaded;
-      expect(reloaded.providersOrder, legacyOrder);
-    },
-  );
+    final reloaded = SettingsProvider(BusinessPreferences(repository));
+    await reloaded.loaded;
+    expect(reloaded.providersOrder, isEmpty);
+  });
 
   test(
     'preserves existing retired provider configs as user providers',
@@ -345,4 +345,63 @@ void main() {
       );
     },
   );
+
+  test('corrupted provider config locks whole-table writes', () async {
+    const corrupt = '{ this is not json';
+    await repository.setPreference('provider_configs_v1', corrupt);
+
+    final settings = SettingsProvider(BusinessPreferences(repository));
+    await settings.loaded;
+
+    expect(settings.providerConfigsCorrupted, isTrue);
+    expect(settings.providerConfigs, isEmpty);
+
+    // 损坏状态下所有整表写入都必须被拒绝，避免覆盖用户原始数据。
+    await settings.setProviderConfig(
+      'OpenAI',
+      settings.getProviderConfig('OpenAI'),
+    );
+    await settings.removeProviderConfig('OpenAI');
+    await settings.setProvidersOrder(<String>['OpenAI']);
+
+    expect(settings.providerConfigsCorrupted, isTrue);
+    expect(await repository.getPreference('provider_configs_v1'), corrupt);
+  });
+
+  test('reset provider configs clears corruption and writes back', () async {
+    const corrupt = '{ this is not json';
+    await repository.setPreference('provider_configs_v1', corrupt);
+
+    final settings = SettingsProvider(BusinessPreferences(repository));
+    await settings.loaded;
+    expect(settings.providerConfigsCorrupted, isTrue);
+
+    await settings.resetProviderConfigs();
+
+    expect(settings.providerConfigsCorrupted, isFalse);
+    expect(settings.providerConfigs, isEmpty);
+    // 重置后重启不应再判定为损坏。
+    final reloaded = SettingsProvider(BusinessPreferences(repository));
+    await reloaded.loaded;
+    expect(reloaded.providerConfigsCorrupted, isFalse);
+    expect(reloaded.providerConfigs, isEmpty);
+  });
+
+  test('any provider key can be removed, including former built-ins', () async {
+    final settings = SettingsProvider(BusinessPreferences(repository));
+    await settings.loaded;
+
+    for (final key in <String>['KelivoIN', 'OpenAI', '随想AI中转站']) {
+      await settings.setProviderConfig(key, settings.getProviderConfig(key));
+    }
+    expect(settings.providerConfigs.keys, containsAll(<String>['KelivoIN']));
+
+    await settings.removeProviderConfig('KelivoIN');
+    expect(settings.providerConfigs.containsKey('KelivoIN'), isFalse);
+
+    final reloaded = SettingsProvider(BusinessPreferences(repository));
+    await reloaded.loaded;
+    expect(reloaded.providerConfigs.containsKey('KelivoIN'), isFalse);
+    expect(reloaded.providerConfigs.containsKey('OpenAI'), isTrue);
+  });
 }

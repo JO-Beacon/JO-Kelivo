@@ -694,11 +694,6 @@ class SettingsSearchIndex {
       keywords: 'collapse long message threshold 长消息 长文本 折叠',
     );
     add(
-      'displaySettingsPageRegenerateDeleteTrailingMessagesTitle',
-      SettingsSearchDestination.behavior,
-      (l) => l.displaySettingsPageRegenerateDeleteTrailingMessagesTitle,
-    );
-    add(
       'displaySettingsPageShowRegenerateConfirmDialogTitle',
       SettingsSearchDestination.behavior,
       (l) => l.displaySettingsPageShowRegenerateConfirmDialogTitle,

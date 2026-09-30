@@ -121,6 +121,18 @@ final class BusinessPreferences {
     });
   }
 
+  /// 删除某键在偏好表中的原始行，绕过实体路由。
+  ///
+  /// 供应商配置损坏时，异常数据会以偏好行形式遮蔽实体数据；显式重置
+  /// 必须连同该行一起清除，否则重启后损坏状态会复原。
+  Future<void> removeStoredPreference(String key) async {
+    await load();
+    await _serialize(() async {
+      await _repository.removePreference(key);
+      _values.remove(key);
+    });
+  }
+
   Future<bool> _setValue(String key, Object value) async {
     await load();
     return _serialize(() async {

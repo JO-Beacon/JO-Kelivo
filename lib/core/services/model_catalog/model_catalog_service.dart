@@ -15,7 +15,21 @@ import 'catalog_entry.dart';
 import 'model_catalog_trim.dart';
 
 const String kModelCatalogAssetPath = 'assets/model_catalog/models_dev.json';
-const String kModelCatalogAutoUpdatePrefsKey = 'model_catalog_auto_update_v1';
+const String kModelCatalogUpdateModePrefsKey = 'model_catalog_update_mode_v1';
+
+/// 目录更新的触发方式。
+enum ModelCatalogUpdateMode {
+  /// 只有用户点「立即更新」时才联网。
+  manual,
+
+  /// 启动时检查一次，数据超过 24 小时就自动更新。
+  daily;
+
+  /// 解析存储值；缺省与未知值都落到 [manual]。
+  static ModelCatalogUpdateMode parse(String? raw) {
+    return raw == daily.name ? daily : manual;
+  }
+}
 const String kModelCatalogCacheFileName = 'models_dev.json';
 
 const Duration kModelCatalogStaleAfter = Duration(hours: 24);
@@ -114,19 +128,23 @@ class ModelCatalogService extends ChangeNotifier {
     Future<String> Function()? loadBundledJson,
     Future<Directory> Function()? cacheDirectory,
     http.Client Function()? clientFactory,
+    this._proxyFactory,
     Future<SharedPreferences> Function()? prefs,
     Uri? remoteUri,
     DateTime Function()? now,
   }) : _loadBundledJson = loadBundledJson ?? _defaultLoadBundledJson,
        _cacheDirectory = cacheDirectory ?? _defaultCacheDirectory,
-       _clientFactory = clientFactory ?? _defaultClientFactory,
+       _clientFactoryOverride = clientFactory,
        _prefs = prefs ?? SharedPreferences.getInstance,
        _remoteUri = remoteUri ?? kModelCatalogRemoteUri,
        _now = now ?? DateTime.now;
 
   final Future<String> Function() _loadBundledJson;
   final Future<Directory> Function() _cacheDirectory;
-  final http.Client Function() _clientFactory;
+  final http.Client Function()? _clientFactoryOverride;
+
+  /// 目录刷新用的代理来源；由启动流程接入全局代理设置。
+  NetworkProxyConfig? Function()? _proxyFactory;
   final Future<SharedPreferences> Function() _prefs;
   final Uri _remoteUri;
   final DateTime Function() _now;
@@ -136,7 +154,7 @@ class ModelCatalogService extends ChangeNotifier {
   bool _refreshing = false;
   String? _lastError;
   bool _isBundled = true;
-  bool _autoUpdate = true;
+  ModelCatalogUpdateMode _updateMode = ModelCatalogUpdateMode.manual;
   bool _prefsLoaded = false;
 
   Future<void>? _loadInFlight;
@@ -151,7 +169,8 @@ class ModelCatalogService extends ChangeNotifier {
   String? get lastError => _lastError;
   DateTime? get generatedAt => _data?.generatedAt;
   bool get isBundled => _isBundled;
-  bool get autoUpdate => _autoUpdate;
+  /// 目录更新的触发方式。
+  ModelCatalogUpdateMode get updateMode => _updateMode;
   int get providerCount => _data?.providers.length ?? 0;
   int get modelCount {
     final providers = _data?.providers;
@@ -172,19 +191,35 @@ class ModelCatalogService extends ChangeNotifier {
         kModelCatalogStaleAfter;
   }
 
-  Future<void> setAutoUpdate(bool value) async {
-    final changed = _autoUpdate != value;
-    _autoUpdate = value;
+  /// 目录刷新用的客户端；测试可注入，生产走全局代理。
+  http.Client _createClient() {
+    final override = _clientFactoryOverride;
+    if (override != null) return override();
+    return DioHttpClient(
+      proxy: _proxyFactory?.call(),
+      timeout: kModelCatalogRefreshTimeout,
+      logRequests: false,
+    );
+  }
+
+  Future<void> setUpdateMode(ModelCatalogUpdateMode value) async {
+    final changed = _updateMode != value;
+    _updateMode = value;
     if (changed) {
       notifyListeners();
     }
     try {
       final prefs = await _prefs();
-      await prefs.setBool(kModelCatalogAutoUpdatePrefsKey, value);
+      await prefs.setString(kModelCatalogUpdateModePrefsKey, value.name);
       _prefsLoaded = true;
     } catch (error) {
       _lastError = error.toString();
     }
+  }
+
+  /// 接入全局代理设置；目录刷新没有供应商归属，只能走全局那一份。
+  set proxyFactory(NetworkProxyConfig? Function()? value) {
+    _proxyFactory = value;
   }
 
   Future<void> ensureLoaded() {
@@ -206,7 +241,7 @@ class ModelCatalogService extends ChangeNotifier {
     try {
       await _ensurePrefsLoaded();
       await ensureLoaded();
-      if (_autoUpdate && isStale) {
+      if (_updateMode == ModelCatalogUpdateMode.daily && isStale) {
         await refresh();
       }
     } catch (error) {
@@ -465,7 +500,7 @@ class ModelCatalogService extends ChangeNotifier {
   }
 
   Future<String> _downloadRemote() async {
-    final client = _clientFactory();
+    final client = _createClient();
     try {
       final response = await client.get(_remoteUri);
       if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -500,9 +535,11 @@ class ModelCatalogService extends ChangeNotifier {
     }
     try {
       final prefs = await _prefs();
-      final value = prefs.getBool(kModelCatalogAutoUpdatePrefsKey) ?? true;
-      final changed = _autoUpdate != value;
-      _autoUpdate = value;
+      final mode = ModelCatalogUpdateMode.parse(
+        prefs.getString(kModelCatalogUpdateModePrefsKey),
+      );
+      final changed = _updateMode != mode;
+      _updateMode = mode;
       if (changed) {
         notifyListeners();
       }
@@ -731,11 +768,4 @@ Future<String> _defaultLoadBundledJson() {
 Future<Directory> _defaultCacheDirectory() async {
   final support = await getApplicationSupportDirectory();
   return Directory('${support.path}/model_catalog');
-}
-
-http.Client _defaultClientFactory() {
-  return DioHttpClient(
-    timeout: kModelCatalogRefreshTimeout,
-    logRequests: false,
-  );
 }

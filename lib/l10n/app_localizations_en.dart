@@ -1865,7 +1865,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String contextTreeMigrationWarningsContent(int count) {
-    return 'JO-AIClient repaired $count missing selected-version records while converting legacy chat branches. The repaired choices were written to the warning log. No message text was opened or changed.';
+    return 'JO-AIClient repaired $count missing selected-branch records while converting legacy chat branches. The repaired choices were written to the warning log. No message text was opened or changed.';
   }
 
   @override
@@ -2754,7 +2754,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatMessageWidgetRegenerateConfirmContent =>
-      'Regenerating only updates this message and keeps the messages below it. Continue?';
+      'Regenerating creates a new branch and keeps the previous reply. Messages below are not deleted. Continue?';
 
   @override
   String get chatMessageWidgetRegenerateConfirmInterruptNotice =>
@@ -4175,7 +4175,41 @@ class AppLocalizationsEn extends AppLocalizations {
   String get providersPageAddTooltip => 'Add';
 
   @override
+  String get providerAddSheetPresetsTab => 'Presets';
+
+  @override
+  String get providerAddSheetPresetsHint =>
+      'Pick a vendor to fill in the name and base URL.';
+
+  @override
   String get providersPageSearchHint => 'Search providers or groups';
+
+  @override
+  String get providersPageEmptyStateHint =>
+      'No providers yet. Add one to get started.';
+
+  @override
+  String get providersPageEmptyStateAddAction => 'Add provider';
+
+  @override
+  String get providersPageConfigCorruptedError =>
+      'Provider settings failed to load. Editing is locked to avoid overwriting the original data.';
+
+  @override
+  String get providersPageResetConfigAction => 'Reset provider settings';
+
+  @override
+  String get providersPageResetConfigConfirmTitle => 'Reset provider settings?';
+
+  @override
+  String get providersPageResetConfigConfirmContent =>
+      'This clears all provider settings, order, and groups. The original data cannot be restored automatically.';
+
+  @override
+  String get providersPageResetConfigConfirmOk => 'Reset';
+
+  @override
+  String get providersPageResetConfigDoneSnackbar => 'Provider settings reset';
 
   @override
   String get providersPageProviderAddedSnackbar => 'Provider added';
@@ -6391,6 +6425,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get providersPageExportAction => 'Export';
+
+  @override
+  String get providersPageSelectAllAction => 'Select all';
+
+  @override
+  String get providersPageDeselectAllAction => 'Deselect all';
+
+  @override
+  String get providersPageMoveToGroupAction => 'Move to group';
 
   @override
   String get assistantEditPresetTitle => 'Preset conversation';
@@ -8924,7 +8967,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get messageEditDeletePartConfirmMessage =>
-      'This change only affects the edited message version.';
+      'This change only affects the edited branch.';
 
   @override
   String get messageEditCancel => 'Cancel';
@@ -10031,16 +10074,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get modelSelectSheetFollowAssistant => 'Follow assistant';
 
   @override
-  String get displaySettingsPageForkKeepMessageVersionsTitle =>
-      'Keep Message Versions When Forking';
-
-  @override
   String get displaySettingsPageEditAssistantKeepThinkingToolCardsTitle =>
       'Keep thinking and tool cards when editing assistant';
 
   @override
   String get displaySettingsPageEditAssistantKeepThinkingToolCardsSubtitle =>
-      'When off, the edited version keeps only the assistant text. Switching back still shows previous thinking and tool cards.';
+      'When off, the edited branch keeps only the assistant text. Switching back still shows previous thinking and tool cards.';
 
   @override
   String get themeAdvancedSettingsPageTitle => 'Theme Advanced';
@@ -12797,10 +12836,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mcpServerEditSheetHttpUrlHint => 'http://localhost:3000';
 
   @override
-  String get chatMessageWidgetRegenerateConfirmDeleteTrailingContent =>
-      'Regenerating will delete all messages below this message and cannot be undone. Continue?';
-
-  @override
   String get aboutPageEasterEggMessage =>
       'Thanks for exploring! \n (No egg yet)';
 
@@ -12814,10 +12849,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get aboutPageKelivoSearchAlreadyUnlocked =>
       'You\'ve already been through this door.';
-
-  @override
-  String get displaySettingsPageRegenerateDeleteTrailingMessagesTitle =>
-      'Delete messages below when regenerating';
 
   @override
   String get searchServiceNameKimi => 'Kimi';
@@ -12945,7 +12976,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get scheduledTasksContextPolicyTip =>
-      'Follow latest conversation: new messages, edits or switching message versions invalidate the prepared result; preparing again uses another attempt and may cost extra.\n\nUse preparation snapshot: keep the prepared result even if the conversation changes. It will not reflect later messages.';
+      'Follow latest conversation: new messages, edits or switching branches invalidate the prepared result; preparing again uses another attempt and may cost extra.\n\nUse preparation snapshot: keep the prepared result even if the conversation changes. It will not reflect later messages.';
 
   @override
   String get scheduledTasksPreparationWindowTip =>
@@ -13709,6 +13740,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get modelCatalogAutoUpdate => 'Auto-update every 24 hours';
+
+  @override
+  String get modelCatalogUpdateManual => 'Manual only';
 
   @override
   String get modelCatalogRefresh => 'Update now';

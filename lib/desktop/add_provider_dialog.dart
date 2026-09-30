@@ -7,6 +7,7 @@ import '../shared/widgets/ios_switch.dart';
 
 import '../l10n/app_localizations.dart';
 import '../icons/lucide_adapter.dart' as lucide;
+import '../core/providers/provider_preset.dart';
 import '../core/providers/settings_provider.dart';
 import '../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
@@ -42,7 +43,7 @@ class _AddProviderDialogBody extends StatefulWidget {
 
 class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
     with SingleTickerProviderStateMixin {
-  late final TabController _tab = TabController(length: 3, vsync: this);
+  late final TabController _tab = TabController(length: 4, vsync: this);
 
   // OpenAI
   bool _openaiEnabled = true;
@@ -166,6 +167,55 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
     );
   }
 
+  /// 厂商预设：与三个协议模板并列，选中即填好名称与地址。
+  Widget _presetsList(AppLocalizations l10n) {
+    final cs = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
+          child: Text(
+            l10n.providerAddSheetPresetsHint,
+            style: TextStyle(
+              fontSize: 12,
+              color: cs.onSurface.withValues(alpha: 0.6),
+            ),
+          ),
+        ),
+        for (final key in ProviderPreset.vendorKeys)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: _PresetRow(
+              label: ProviderPreset.label(key, l10n),
+              baseUrl: ProviderConfig.defaultsFor(key).baseUrl,
+              onTap: () => _applyPreset(key),
+            ),
+          ),
+      ],
+    );
+  }
+
+  void _applyPreset(String key) {
+    final preset = ProviderConfig.defaultsFor(key);
+    switch (ProviderConfig.classify(key)) {
+      case ProviderKind.google:
+        _googleName.text = key;
+        _googleBase.text = preset.baseUrl;
+        _tab.animateTo(2);
+      case ProviderKind.claude:
+        _claudeName.text = key;
+        _claudeBase.text = preset.baseUrl;
+        _tab.animateTo(3);
+      case ProviderKind.openai:
+        _openaiName.text = key;
+        _openaiBase.text = preset.baseUrl;
+        _openaiPath.text = preset.chatPath ?? '/chat/completions';
+        _tab.animateTo(1);
+    }
+    setState(() {});
+  }
+
   Future<void> _importGoogleServiceAccount() async {
     try {
       final result = await FilePicker.platform.pickFiles(
@@ -216,6 +266,9 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
     final idx = _tab.index;
     String createdKey = '';
     if (idx == 0) {
+      // 预设页只负责预填，不在这里提交。
+      return;
+    } else if (idx == 1) {
       final rawName = _openaiName.text.trim();
       final display = rawName.isEmpty ? 'OpenAI' : rawName;
       final keyName = uniqueKey('OpenAI', display);
@@ -247,7 +300,7 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
       );
       await settings.setProviderConfig(keyName, cfg);
       createdKey = keyName;
-    } else if (idx == 1) {
+    } else if (idx == 2) {
       final rawName = _googleName.text.trim();
       final display = rawName.isEmpty ? 'Google' : rawName;
       final keyName = uniqueKey('Google', display);
@@ -370,7 +423,12 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                   child: _SmallSegTabBar(
                     controller: _tab,
-                    tabs: const ['OpenAI', 'Google', 'Claude'],
+                    tabs: [
+                      l10n.providerAddSheetPresetsTab,
+                      'OpenAI',
+                      'Google',
+                      'Claude',
+                    ],
                   ),
                 ),
                 // 内容区
@@ -384,8 +442,10 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
                         return ListView(
                           children: [
                             if (idx == 0)
-                              _openaiForm(l10n)
+                              _presetsList(l10n)
                             else if (idx == 1)
+                              _openaiForm(l10n)
+                            else if (idx == 2)
                               _googleForm(l10n)
                             else
                               _claudeForm(l10n),
@@ -396,19 +456,24 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
                     ),
                   ),
                 ),
-                // 底部操作区
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                  child: Row(
-                    children: [
-                      const Spacer(),
-                      _PrimaryDeskButton(
-                        icon: lucide.Lucide.Plus,
-                        label: l10n.addProviderSheetAddButton,
-                        onTap: _onAdd,
-                      ),
-                    ],
-                  ),
+                // 底部操作区；预设页只负责预填，提交是空操作，因此不给按钮。
+                AnimatedBuilder(
+                  animation: _tab,
+                  builder: (_, __) => _tab.index == 0
+                      ? const SizedBox.shrink()
+                      : Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                          child: Row(
+                            children: [
+                              const Spacer(),
+                              _PrimaryDeskButton(
+                                icon: lucide.Lucide.Plus,
+                                label: l10n.addProviderSheetAddButton,
+                                onTap: _onAdd,
+                              ),
+                            ],
+                          ),
+                        ),
                 ),
               ],
             ),
@@ -753,6 +818,76 @@ class _PrimaryDeskButtonState extends State<_PrimaryDeskButton> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 预设列表行：名称 + 接口地址。
+class _PresetRow extends StatefulWidget {
+  const _PresetRow({
+    required this.label,
+    required this.baseUrl,
+    required this.onTap,
+  });
+
+  final String label;
+  final String baseUrl;
+  final VoidCallback onTap;
+
+  @override
+  State<_PresetRow> createState() => _PresetRowState();
+}
+
+class _PresetRowState extends State<_PresetRow> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) => setState(() => _pressed = false),
+      onTapCancel: () => setState(() => _pressed = false),
+      onTap: widget.onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: cs.onSurface.withValues(alpha: _pressed ? 0.10 : 0.05),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.4)),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.label,
+                    style: TextStyle(fontSize: 14, color: cs.onSurface),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    widget.baseUrl,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: cs.onSurface.withValues(alpha: 0.55),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              lucide.Lucide.ChevronRight,
+              size: 16,
+              color: cs.onSurface.withValues(alpha: 0.5),
+            ),
+          ],
         ),
       ),
     );

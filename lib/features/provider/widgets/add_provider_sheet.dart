@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import 'package:provider/provider.dart';
+import '../../../core/providers/provider_preset.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../icons/lucide_adapter.dart';
 import 'package:file_picker/file_picker.dart';
@@ -36,7 +37,7 @@ class _AddProviderSheet extends StatefulWidget {
 
 class _AddProviderSheetState extends State<_AddProviderSheet>
     with SingleTickerProviderStateMixin {
-  late final TabController _tab = TabController(length: 4, vsync: this);
+  late final TabController _tab = TabController(length: 5, vsync: this);
 
   @override
   void initState() {
@@ -351,8 +352,10 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
     }
 
     final idx = _tab.index;
+    // 预设页只负责预填，账号页走登录面板，都不在这里提交。
+    if (idx == 0 || idx == 4) return;
     String createdKey = '';
-    if (idx == 0) {
+    if (idx == 1) {
       final rawName = _openaiName.text.trim();
       final display = rawName.isEmpty ? 'OpenAI' : rawName;
       final keyName = uniqueKey('OpenAI', display);
@@ -384,7 +387,7 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
       );
       await settings.setProviderConfig(keyName, cfg);
       createdKey = keyName;
-    } else if (idx == 1) {
+    } else if (idx == 2) {
       final rawName = _googleName.text.trim();
       final display = rawName.isEmpty ? 'Google' : rawName;
       final keyName = uniqueKey('Google', display);
@@ -420,7 +423,7 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
       );
       await settings.setProviderConfig(keyName, cfg);
       createdKey = keyName;
-    } else {
+    } else if (idx == 3) {
       final rawName = _claudeName.text.trim();
       final display = rawName.isEmpty ? 'Claude' : rawName;
       final keyName = uniqueKey('Claude', display);
@@ -447,6 +450,9 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
       await settings.setProviderConfig(keyName, cfg);
       createdKey = keyName;
     }
+
+    // 没建出东西就不要写顺序表，否则会插进一个空键。
+    if (createdKey.isEmpty) return;
 
     // 确保供应商至少出现在顺序列表中一次
     final order = List<String>.of(settings.providersOrder);
@@ -519,7 +525,13 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: _SegTabBar(
                   controller: _tab,
-                  tabs: ['OpenAI', 'Google', 'Claude', l10n.oauthAccountsTab],
+                  tabs: [
+                    l10n.providerAddSheetPresetsTab,
+                    'OpenAI',
+                    'Google',
+                    'Claude',
+                    l10n.oauthAccountsTab,
+                  ],
                 ),
               ),
               const SizedBox(height: 12),
@@ -535,10 +547,11 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
                           final idx = _tab.index;
                           return Column(
                             children: [
-                              if (idx == 0) _openaiForm(l10n),
-                              if (idx == 1) _googleForm(l10n),
-                              if (idx == 2) _claudeForm(l10n),
-                              if (idx == 3)
+                              if (idx == 0) _presetsPage(l10n),
+                              if (idx == 1) _openaiForm(l10n),
+                              if (idx == 2) _googleForm(l10n),
+                              if (idx == 3) _claudeForm(l10n),
+                              if (idx == 4)
                                 OAuthLoginPanel(
                                   onViewDetails: (id) =>
                                       showOAuthProviderDetails(context, id),
@@ -552,7 +565,9 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
                   ),
                 ),
               ),
-              if (_tab.index < 3)
+              // 只在 OpenAI / Google / Claude 三个表单页显示添加按钮：
+              // 预设页只负责预填（提交为空操作），账号页走自己的登录面板。
+              if (_tab.index >= 1 && _tab.index <= 3)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
                   child: SizedBox(
@@ -627,6 +642,99 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
         ),
       ],
     );
+  }
+
+  /// 厂商预设页：与三个协议模板并列，选中即填好名称与地址，用户仍可改。
+  ///
+  /// 供应商方言按域名识别（见 vendor_defaults），所以关键是地址填对。
+  Widget _presetsPage(AppLocalizations l10n) {
+    final cs = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
+          child: Text(
+            l10n.providerAddSheetPresetsHint,
+            style: TextStyle(
+              fontSize: 12,
+              color: cs.onSurface.withValues(alpha: 0.6),
+            ),
+          ),
+        ),
+        for (final key in ProviderPreset.vendorKeys)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: _TactileRow(
+              onTap: () => _applyPreset(key),
+              builder: (pressed) => Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: cs.onSurface.withValues(alpha: pressed ? 0.10 : 0.05),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: cs.outlineVariant.withValues(alpha: 0.4),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            ProviderPreset.label(key, l10n),
+                            style: TextStyle(fontSize: 14, color: cs.onSurface),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            ProviderConfig.defaultsFor(key).baseUrl,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: cs.onSurface.withValues(alpha: 0.55),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(
+                      Lucide.ChevronRight,
+                      size: 16,
+                      color: cs.onSurface.withValues(alpha: 0.5),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// 套用厂商预设：填名称与地址并切到对应协议的表单。
+  void _applyPreset(String key) {
+    final preset = ProviderConfig.defaultsFor(key);
+    switch (ProviderConfig.classify(key)) {
+      case ProviderKind.google:
+        _googleName.text = key;
+        _googleBase.text = preset.baseUrl;
+        _tab.animateTo(2);
+      case ProviderKind.claude:
+        _claudeName.text = key;
+        _claudeBase.text = preset.baseUrl;
+        _tab.animateTo(3);
+      case ProviderKind.openai:
+        _openaiName.text = key;
+        _openaiBase.text = preset.baseUrl;
+        _openaiPath.text = preset.chatPath ?? '/chat/completions';
+        _tab.animateTo(1);
+    }
+    setState(() {});
   }
 
   Future<void> _importGoogleServiceAccount() async {

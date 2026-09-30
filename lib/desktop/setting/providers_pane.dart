@@ -16,6 +16,7 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
   String? _selectedKey;
   final GlobalKey<DesktopProviderDetailPaneState> _detailKey =
       GlobalKey<DesktopProviderDetailPaneState>();
+  final GlobalKey _catalogAnchorKey = GlobalKey();
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   Timer? _groupReorderRestoreTimer;
@@ -201,7 +202,6 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
     required ({String name, String key}) item,
     required SettingsProvider settings,
     required List<({String name, String key})> ordered,
-    required Set<String> baseKeys,
     required ColorScheme colorScheme,
   }) {
     final cfg = settings.getProviderConfig(item.key, defaultName: item.name);
@@ -232,57 +232,81 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
           );
         });
       },
-      onDelete: baseKeys.contains(item.key)
-          ? null
-          : () async {
-              final l10n = AppLocalizations.of(context)!;
-              final ap = context.read<AssistantProvider>();
-              final chatService = context.read<ChatService>();
-              final ok = await showDialog<bool>(
-                context: context,
-                builder: (ctx) => AlertDialog(
-                  shape: DesktopDialogStyle.shape(ctx),
-                  title: Text(l10n.providerDetailPageDeleteProviderTitle),
-                  content: Text(l10n.providerDetailPageDeleteProviderContent),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.of(ctx).pop(false),
-                      child: Text(l10n.providerDetailPageCancelButton),
-                    ),
-                    TextButton(
-                      onPressed: () => Navigator.of(ctx).pop(true),
-                      child: Text(
-                        l10n.providerDetailPageDeleteButton,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
-                        ),
-                      ),
-                    ),
-                  ],
+      onDelete: () async {
+        final l10n = AppLocalizations.of(context)!;
+        final ap = context.read<AssistantProvider>();
+        final chatService = context.read<ChatService>();
+        final ok = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: DesktopDialogStyle.shape(ctx),
+            title: Text(l10n.providerDetailPageDeleteProviderTitle),
+            content: Text(l10n.providerDetailPageDeleteProviderContent),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: Text(l10n.providerDetailPageCancelButton),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: Text(
+                  l10n.providerDetailPageDeleteButton,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
                 ),
+              ),
+            ],
+          ),
+        );
+        if (ok != true) return;
+        try {
+          await chatService.clearConversationModelOverrides(
+            providerKey: item.key,
+          );
+          for (final assistant in ap.assistants) {
+            if (assistant.chatModelProvider == item.key) {
+              await ap.updateAssistant(
+                assistant.copyWith(clearChatModel: true),
               );
-              if (ok != true) return;
-              try {
-                await chatService.clearConversationModelOverrides(
-                  providerKey: item.key,
-                );
-                for (final assistant in ap.assistants) {
-                  if (assistant.chatModelProvider == item.key) {
-                    await ap.updateAssistant(
-                      assistant.copyWith(clearChatModel: true),
-                    );
-                  }
-                }
-              } catch (_) {}
-              await settings.removeProviderConfig(item.key);
-              if (!mounted) return;
-              setState(() {
-                if (_selectedKey == item.key) {
-                  _selectedKey = ordered.isNotEmpty ? ordered.first.key : null;
-                }
-              });
-            },
+            }
+          }
+        } catch (_) {}
+        await settings.removeProviderConfig(item.key);
+        if (!mounted) return;
+        setState(() {
+          if (_selectedKey == item.key) {
+            _selectedKey = ordered.isNotEmpty ? ordered.first.key : null;
+          }
+        });
+      },
     );
+  }
+
+  Future<void> _confirmResetProviderConfigs() async {
+    final l10n = AppLocalizations.of(context)!;
+    final settings = context.read<SettingsProvider>();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: DesktopDialogStyle.shape(ctx),
+        title: Text(l10n.providersPageResetConfigConfirmTitle),
+        content: Text(l10n.providersPageResetConfigConfirmContent),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l10n.providerDetailPageCancelButton),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(
+              l10n.providersPageResetConfigConfirmOk,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || ok != true) return;
+    await settings.resetProviderConfigs();
   }
 
   @override
@@ -291,36 +315,17 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
     final l10n = AppLocalizations.of(context)!;
     final settings = context.watch<SettingsProvider>();
 
-    // 基础供应商（与移动端列表相同）
-    List<({String name, String key})> base() => [
-      (name: 'OpenAI', key: 'OpenAI'),
-      (name: l10n.providersPageSiliconFlowName, key: 'SiliconFlow'),
-      (name: 'Gemini', key: 'Gemini'),
-      (name: 'OpenRouter', key: 'OpenRouter'),
-      (name: 'KelivoIN', key: 'KelivoIN'),
-      (name: 'Tensdaq', key: 'Tensdaq'),
-      (name: 'DeepSeek', key: 'DeepSeek'),
-      (name: 'AIhubmix', key: 'AIhubmix'),
-      (name: l10n.providersPageAliyunName, key: 'Aliyun'),
-      (name: l10n.providersPageZhipuName, key: 'Zhipu AI'),
-      (name: 'Claude', key: 'Claude'),
-      (name: 'Grok', key: 'Grok'),
-      (name: l10n.providersPageByteDanceName, key: 'ByteDance'),
-    ];
-
+    // 列表只看真实存在的配置；不再有“内置项”这份写死的名录。
     final cfgs = settings.providerConfigs;
-    final baseKeys = {for (final p in base()) p.key};
-    final dynamicItems = <({String name, String key})>[];
-    cfgs.forEach((key, cfg) {
-      if (!baseKeys.contains(key)) {
-        dynamicItems.add((
-          name: (cfg.name.isNotEmpty ? cfg.name : key),
-          key: key,
-        ));
-      }
-    });
+    final allItems = <({String name, String key})>[
+      for (final entry in cfgs.entries)
+        (
+          name: entry.value.name.isNotEmpty ? entry.value.name : entry.key,
+          key: entry.key,
+        ),
+    ];
     // 应用已保存的顺序
-    final merged = <({String name, String key})>[...base(), ...dynamicItems];
+    final merged = allItems;
     final order = settings.providersOrder;
     final map = {for (final p in merged) p.key: p};
     final ordered = <({String name, String key})>[];
@@ -395,6 +400,24 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
                         ),
                         const SizedBox(width: 4),
                         Tooltip(
+                          message: l10n.modelCatalogTitle,
+                          child: KeyedSubtree(
+                            key: _catalogAnchorKey,
+                            child: _IconBtn(
+                              icon: lucide.Lucide.BookOpen,
+                              onTap: () {
+                                unawaited(
+                                  showDesktopModelCatalogPopover(
+                                    context,
+                                    anchorKey: _catalogAnchorKey,
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Tooltip(
                           message: l10n.providersPageImportTooltip,
                           child: _IconBtn(
                             icon: lucide.Lucide.cloudDownload,
@@ -414,7 +437,27 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
                     ),
                     const SizedBox(height: 8),
                     Expanded(
-                      child: groupingActive
+                      child: settings.providerConfigsCorrupted
+                          ? _DesktopProviderConfigErrorView(
+                              message: l10n.providersPageConfigCorruptedError,
+                              actionLabel: l10n.providersPageResetConfigAction,
+                              onReset: _confirmResetProviderConfigs,
+                            )
+                          : ordered.isEmpty && _searchQuery.isEmpty
+                          ? _DesktopProvidersEmptyState(
+                              hint: l10n.providersPageEmptyStateHint,
+                              actionLabel:
+                                  l10n.providersPageEmptyStateAddAction,
+                              onAdd: () async {
+                                final created =
+                                    await showDesktopAddProviderDialog(context);
+                                if (!mounted) return;
+                                if (created != null && created.isNotEmpty) {
+                                  setState(() => _selectedKey = created);
+                                }
+                              },
+                            )
+                          : groupingActive
                           ? ReorderableListView.builder(
                               buildDefaultDragHandles: false,
                               padding: EdgeInsets.zero,
@@ -636,7 +679,6 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
                                                       item: row.item,
                                                       settings: settings,
                                                       ordered: ordered,
-                                                      baseKeys: baseKeys,
                                                       colorScheme: cs,
                                                     )
                                                   : ReorderableDragStartListener(
@@ -646,7 +688,6 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
                                                             item: row.item,
                                                             settings: settings,
                                                             ordered: ordered,
-                                                            baseKeys: baseKeys,
                                                             colorScheme: cs,
                                                           ),
                                                     ),
@@ -689,7 +730,6 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
                                   item: item,
                                   settings: settings,
                                   ordered: ordered,
-                                  baseKeys: baseKeys,
                                   colorScheme: cs,
                                 );
                                 return KeyedSubtree(
@@ -7082,3 +7122,106 @@ class _CardPressState extends State<_CardPress> {
 // 已移除内嵌默认模型卡片；现在位于 setting/default_model_pane.dart
 
 // ===== 显示设置主体 =====
+
+// 供应商配置损坏时的错误视图：提示 + 显式重置入口。
+class _DesktopProviderConfigErrorView extends StatelessWidget {
+  const _DesktopProviderConfigErrorView({
+    required this.message,
+    required this.actionLabel,
+    required this.onReset,
+  });
+
+  final String message;
+  final String actionLabel;
+  final VoidCallback onReset;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: cs.error.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: cs.error.withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(lucide.Lucide.TriangleAlert, size: 16, color: cs.error),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  message,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: cs.onSurface.withValues(alpha: 0.85),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _DeskIosButton(
+            label: actionLabel,
+            onTap: onReset,
+            danger: true,
+            dense: true,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// 列表为空时的引导：一句说明 + 添加供应商入口。
+class _DesktopProvidersEmptyState extends StatelessWidget {
+  const _DesktopProvidersEmptyState({
+    required this.hint,
+    required this.actionLabel,
+    required this.onAdd,
+  });
+
+  final String hint;
+  final String actionLabel;
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              lucide.Lucide.Plus,
+              size: 28,
+              color: cs.onSurface.withValues(alpha: 0.35),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              hint,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                color: cs.onSurface.withValues(alpha: 0.7),
+              ),
+            ),
+            const SizedBox(height: 12),
+            _DeskIosButton(
+              label: actionLabel,
+              onTap: onAdd,
+              filled: true,
+              dense: true,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

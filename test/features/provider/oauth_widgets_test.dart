@@ -366,7 +366,7 @@ void main() {
   );
 
   testWidgets(
-    'account login is the fourth add tab and offers all four providers',
+    'account login remains reachable as the last add tab and offers all four providers',
     (tester) async {
       tester.view.physicalSize = const Size(390, 844);
       tester.view.devicePixelRatio = 1;
@@ -392,6 +392,9 @@ void main() {
       await tester.tap(find.text('Add'));
       await tester.pumpAndSettle();
       expect(find.text('OpenAI'), findsWidgets);
+      // 分段栏可横向滚动；账号标签默认在屏幕外，先滚到可见再点。
+      await tester.ensureVisible(find.text('Accounts'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Accounts'));
       await tester.pumpAndSettle();
       expect(find.text('ChatGPT'), findsOneWidget);
@@ -411,6 +414,105 @@ void main() {
       await snapshot(tester, key, 'oauth-add-accounts');
     },
   );
+
+  testWidgets('add button appears on the three provider form tabs only', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      app(
+        Builder(
+          builder: (context) => Center(
+            child: IosTileButton(
+              label: 'Add',
+              icon: LucideIcons.plus,
+              onTap: () => showAddProviderSheet(context),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Add'));
+    await tester.pumpAndSettle();
+
+    // 弹窗下方的页面里也有一个同名按钮，弹窗打开后被遮罩盖住；
+    // hitTestable 只留下弹窗自己那个按钮。
+    Finder addButton() =>
+        find.widgetWithText(IosTileButton, 'Add').hitTestable();
+    Future<void> openTab(String label) async {
+      // 厂商名会在预设列表和表单标题里重名，页签在结构中排在前面。
+      final tab = find.text(label).first;
+      await tester.ensureVisible(tab);
+      await tester.pumpAndSettle();
+      await tester.tap(tab);
+      await tester.pumpAndSettle();
+    }
+
+    // 预设页只负责预填，提交是空操作，因此不给按钮。
+    expect(addButton(), findsNothing, reason: '预设页不应有添加按钮');
+
+    // 三个表单页都必须能提交；Claude 页曾经因为页序左移而漏掉按钮。
+    for (final label in const ['OpenAI', 'Google', 'Claude']) {
+      await openTab(label);
+      expect(addButton(), findsOneWidget, reason: '$label 页应有添加按钮');
+    }
+
+    await openTab('Accounts');
+    expect(addButton(), findsNothing, reason: '账号页走登录面板，不应有添加按钮');
+    expect(tester.takeException(), isNull);
+  });
+
+  // 页签编号一旦错位，建立出来的类型就会串位，因此每个表单页单独一个用例。
+  const addTabExpectations = <String, ProviderKind>{
+    'OpenAI': ProviderKind.openai,
+    'Google': ProviderKind.google,
+    'Claude': ProviderKind.claude,
+  };
+
+  for (final entry in addTabExpectations.entries) {
+    testWidgets(
+      'the ${entry.key} add tab creates a ${entry.value.name} provider',
+      (tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        await tester.pumpWidget(
+          app(
+            Builder(
+              builder: (context) => Center(
+                child: IosTileButton(
+                  label: 'Open sheet',
+                  icon: LucideIcons.plus,
+                  onTap: () => showAddProviderSheet(context),
+                ),
+              ),
+            ),
+          ),
+        );
+
+        await tester.tap(find.text('Open sheet'));
+        await tester.pumpAndSettle();
+        final tab = find.text(entry.key).first;
+        await tester.ensureVisible(tab);
+        await tester.pumpAndSettle();
+        await tester.tap(tab);
+        await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(IosTileButton, 'Add'));
+        await tester.pumpAndSettle();
+
+        final created = settings.providerConfigs.values
+            .where((cfg) => cfg.name == entry.key)
+            .toList();
+        expect(created, hasLength(1), reason: '${entry.key} 页应当只建立1个供应商');
+        expect(created.single.providerType, entry.value);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   for (final brightness in Brightness.values) {
     testWidgets(

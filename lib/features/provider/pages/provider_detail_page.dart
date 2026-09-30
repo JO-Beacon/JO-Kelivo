@@ -130,24 +130,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
-    bool isUserAdded(String key) {
-      const fixed = {
-        'KelivoIN',
-        'OpenAI',
-        'Gemini',
-        'SiliconFlow',
-        'OpenRouter',
-        'DeepSeek',
-        'Tensdaq',
-        'AIhubmix',
-        'Aliyun',
-        'Zhipu AI',
-        'Claude',
-        'Grok',
-        'ByteDance',
-      };
-      return !fixed.contains(key);
-    }
 
     return Scaffold(
       appBar: AppBar(
@@ -240,10 +222,9 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
               },
             ),
           ),
-          if (isUserAdded(widget.keyName))
-            Tooltip(
-              message: l10n.providerDetailPageDeleteProviderTooltip,
-              child: _TactileIconButton(
+          Tooltip(
+            message: l10n.providerDetailPageDeleteProviderTooltip,
+            child: _TactileIconButton(
                 icon: Lucide.Trash2,
                 color: cs.error,
                 semanticLabel: l10n.providerDetailPageDeleteProviderTooltip,

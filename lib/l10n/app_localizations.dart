@@ -3499,7 +3499,7 @@ abstract class AppLocalizations {
   /// No description provided for @contextTreeMigrationWarningsContent.
   ///
   /// In en, this message translates to:
-  /// **'JO-AIClient repaired {count} missing selected-version records while converting legacy chat branches. The repaired choices were written to the warning log. No message text was opened or changed.'**
+  /// **'JO-AIClient repaired {count} missing selected-branch records while converting legacy chat branches. The repaired choices were written to the warning log. No message text was opened or changed.'**
   String contextTreeMigrationWarningsContent(int count);
 
   /// No description provided for @backupRestoreFailureTitle.
@@ -5107,7 +5107,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatMessageWidgetRegenerateConfirmContent.
   ///
   /// In en, this message translates to:
-  /// **'Regenerating only updates this message and keeps the messages below it. Continue?'**
+  /// **'Regenerating creates a new branch and keeps the previous reply. Messages below are not deleted. Continue?'**
   String get chatMessageWidgetRegenerateConfirmContent;
 
   /// No description provided for @chatMessageWidgetRegenerateConfirmInterruptNotice.
@@ -7651,11 +7651,71 @@ abstract class AppLocalizations {
   /// **'Add'**
   String get providersPageAddTooltip;
 
+  /// No description provided for @providerAddSheetPresetsTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Presets'**
+  String get providerAddSheetPresetsTab;
+
+  /// No description provided for @providerAddSheetPresetsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a vendor to fill in the name and base URL.'**
+  String get providerAddSheetPresetsHint;
+
   /// No description provided for @providersPageSearchHint.
   ///
   /// In en, this message translates to:
   /// **'Search providers or groups'**
   String get providersPageSearchHint;
+
+  /// No description provided for @providersPageEmptyStateHint.
+  ///
+  /// In en, this message translates to:
+  /// **'No providers yet. Add one to get started.'**
+  String get providersPageEmptyStateHint;
+
+  /// No description provided for @providersPageEmptyStateAddAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Add provider'**
+  String get providersPageEmptyStateAddAction;
+
+  /// No description provided for @providersPageConfigCorruptedError.
+  ///
+  /// In en, this message translates to:
+  /// **'Provider settings failed to load. Editing is locked to avoid overwriting the original data.'**
+  String get providersPageConfigCorruptedError;
+
+  /// No description provided for @providersPageResetConfigAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset provider settings'**
+  String get providersPageResetConfigAction;
+
+  /// No description provided for @providersPageResetConfigConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset provider settings?'**
+  String get providersPageResetConfigConfirmTitle;
+
+  /// No description provided for @providersPageResetConfigConfirmContent.
+  ///
+  /// In en, this message translates to:
+  /// **'This clears all provider settings, order, and groups. The original data cannot be restored automatically.'**
+  String get providersPageResetConfigConfirmContent;
+
+  /// No description provided for @providersPageResetConfigConfirmOk.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset'**
+  String get providersPageResetConfigConfirmOk;
+
+  /// No description provided for @providersPageResetConfigDoneSnackbar.
+  ///
+  /// In en, this message translates to:
+  /// **'Provider settings reset'**
+  String get providersPageResetConfigDoneSnackbar;
 
   /// No description provided for @providersPageProviderAddedSnackbar.
   ///
@@ -11664,6 +11724,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Export'**
   String get providersPageExportAction;
+
+  /// No description provided for @providersPageSelectAllAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Select all'**
+  String get providersPageSelectAllAction;
+
+  /// No description provided for @providersPageDeselectAllAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Deselect all'**
+  String get providersPageDeselectAllAction;
+
+  /// No description provided for @providersPageMoveToGroupAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Move to group'**
+  String get providersPageMoveToGroupAction;
 
   /// No description provided for @assistantEditPresetTitle.
   ///
@@ -16132,7 +16210,7 @@ abstract class AppLocalizations {
   /// No description provided for @messageEditDeletePartConfirmMessage.
   ///
   /// In en, this message translates to:
-  /// **'This change only affects the edited message version.'**
+  /// **'This change only affects the edited branch.'**
   String get messageEditDeletePartConfirmMessage;
 
   /// No description provided for @messageEditCancel.
@@ -17965,12 +18043,6 @@ abstract class AppLocalizations {
   /// **'Follow assistant'**
   String get modelSelectSheetFollowAssistant;
 
-  /// No description provided for @displaySettingsPageForkKeepMessageVersionsTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Keep Message Versions When Forking'**
-  String get displaySettingsPageForkKeepMessageVersionsTitle;
-
   /// No description provided for @displaySettingsPageEditAssistantKeepThinkingToolCardsTitle.
   ///
   /// In en, this message translates to:
@@ -17980,7 +18052,7 @@ abstract class AppLocalizations {
   /// No description provided for @displaySettingsPageEditAssistantKeepThinkingToolCardsSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'When off, the edited version keeps only the assistant text. Switching back still shows previous thinking and tool cards.'**
+  /// **'When off, the edited branch keeps only the assistant text. Switching back still shows previous thinking and tool cards.'**
   String get displaySettingsPageEditAssistantKeepThinkingToolCardsSubtitle;
 
   /// No description provided for @themeAdvancedSettingsPageTitle.
@@ -22893,12 +22965,6 @@ abstract class AppLocalizations {
   /// **'http://localhost:3000'**
   String get mcpServerEditSheetHttpUrlHint;
 
-  /// No description provided for @chatMessageWidgetRegenerateConfirmDeleteTrailingContent.
-  ///
-  /// In en, this message translates to:
-  /// **'Regenerating will delete all messages below this message and cannot be undone. Continue?'**
-  String get chatMessageWidgetRegenerateConfirmDeleteTrailingContent;
-
   /// No description provided for @aboutPageEasterEggMessage.
   ///
   /// In en, this message translates to:
@@ -22922,12 +22988,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'You\'ve already been through this door.'**
   String get aboutPageKelivoSearchAlreadyUnlocked;
-
-  /// No description provided for @displaySettingsPageRegenerateDeleteTrailingMessagesTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Delete messages below when regenerating'**
-  String get displaySettingsPageRegenerateDeleteTrailingMessagesTitle;
 
   /// No description provided for @searchServiceNameKimi.
   ///
@@ -23154,7 +23214,7 @@ abstract class AppLocalizations {
   /// No description provided for @scheduledTasksContextPolicyTip.
   ///
   /// In en, this message translates to:
-  /// **'Follow latest conversation: new messages, edits or switching message versions invalidate the prepared result; preparing again uses another attempt and may cost extra.\n\nUse preparation snapshot: keep the prepared result even if the conversation changes. It will not reflect later messages.'**
+  /// **'Follow latest conversation: new messages, edits or switching branches invalidate the prepared result; preparing again uses another attempt and may cost extra.\n\nUse preparation snapshot: keep the prepared result even if the conversation changes. It will not reflect later messages.'**
   String get scheduledTasksContextPolicyTip;
 
   /// No description provided for @scheduledTasksPreparationWindowTip.
@@ -24443,6 +24503,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Auto-update every 24 hours'**
   String get modelCatalogAutoUpdate;
+
+  /// No description provided for @modelCatalogUpdateManual.
+  ///
+  /// In en, this message translates to:
+  /// **'Manual only'**
+  String get modelCatalogUpdateManual;
 
   /// No description provided for @modelCatalogRefresh.
   ///

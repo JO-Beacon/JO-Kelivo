@@ -1361,9 +1361,9 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     }
 
     final l10n = AppLocalizations.of(context)!;
-    final baseContent = settings.regenerateDeleteTrailingMessages
-        ? l10n.chatMessageWidgetRegenerateConfirmDeleteTrailingContent
-        : l10n.chatMessageWidgetRegenerateConfirmContent;
+    // 重新生成始终新建分支、不删除后续消息（见 AGENTS 第 9 节），
+    // 因此确认文案固定用“只更新当前消息”那一份。
+    final baseContent = l10n.chatMessageWidgetRegenerateConfirmContent;
     final content = widget.conversationStreaming
         ? '$baseContent\n\n'
               '${l10n.chatMessageWidgetRegenerateConfirmInterruptNotice}'
