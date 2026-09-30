@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JO-AIClient — 基于 Kelivo 的非官方改版 AI 聊天助手</title>
+<meta name="description" content="JO-AIClient 是一个 AI 聊天助手，基于 Kelivo 的非官方改版，按 GNU AGPL-3.0 发布。核心能力是消息级上下文树：分支创建、切换、重新生成、按树结构精确删除，分支关系与分叉锚点完整存入本地 SQLite。">
+<meta name="color-scheme" content="dark">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230e0f10'/%3E%3Cpath d='M19 8v11a5 5 0 0 1-5 5 5 5 0 0 1-4.3-2.4' stroke='%23c8a96a' stroke-width='2.4' fill='none' stroke-linecap='round'/%3E%3Ccircle cx='22.5' cy='11' r='2' fill='%23ecece6'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<a class="skip-link" href="#main">跳到主要内容</a>
+
+<header class="site-header">
+  <div class="container bar">
+    <a class="brand" href="#top">
+      <span class="brand__mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32" width="26" height="26" focusable="false">
+          <path d="M19 7v12a5.5 5.5 0 0 1-5.5 5.5A5.5 5.5 0 0 1 8.8 22" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>
+          <circle cx="23" cy="10.5" r="2.1" fill="currentColor"/>
+        </svg>
+      </span>
+      <span class="brand__text">
+        <span class="brand__name">JO-AIClient</span>
+        <span class="brand__repo">JO-Beacon/JO-Kelivo</span>
+      </span>
+    </a>
+
+    <nav class="site-nav" aria-label="页面区块导航">
+      <a href="#features">产品能力</a>
+      <a href="#kelivo">与 Kelivo 的关系</a>
+      <a href="#download">平台下载</a>
+      <a href="#demo">交互演示</a>
+    </nav>
+
+    <a class="btn btn--primary btn--sm" href="#download">下载</a>
+  </div>
+
+  <p class="disclaimer">
+    <span class="container disclaimer__in">
+      <span class="disclaimer__tag">非官方改版</span>
+      JO-AIClient 是基于 Kelivo 的非官方改版，按 GNU AGPL-3.0 发布。不代表原版作者发布、维护或背书。
+    </span>
+  </p>
+</header>
+
+<main id="main">
+
+  <!-- ============ 首屏 ============ -->
+  <section class="hero" id="top">
+    <div class="container hero__grid">
+
+      <div class="hero__copy">
+        <p class="eyebrow">消息级上下文树 · 本地 SQLite 持久化</p>
+        <h1 class="hero__title">对话不该<br>只有一条线。</h1>
+        <p class="hero__lede">
+          JO-AIClient 是一个 AI 聊天助手，基于 Kelivo 的非官方改版。
+          重新生成、编辑问题、从历史消息继续对话，都会在同一位置长出新分支；
+          分支关系与分叉锚点完整存入本地 SQLite，聊天界面默认只显示当前活动分支。
+        </p>
+
+        <div class="hero__actions">
+          <a class="btn btn--primary" href="#download">
+            下载 JO-AIClient
+            <svg class="btn__ico" viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" focusable="false"><path d="M8 2v9m0 0 3.4-3.4M8 11 4.6 7.6M2.5 13.5h11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </a>
+          <a class="btn btn--ghost" href="#demo">查看交互演示</a>
+        </div>
+
+        <dl class="hero__meta">
+          <div><dt>仓库</dt><dd><a href="https://github.com/JO-Beacon/JO-Kelivo" rel="noopener">JO-Beacon/JO-Kelivo</a></dd></div>
+          <div><dt>上游基座</dt><dd>Kelivo 1.3.0</dd></div>
+          <div><dt>许可证</dt><dd>GNU AGPL-3.0</dd></div>
+        </dl>
+      </div>
+
+      <!-- ---------- 产品界面示意 ---------- -->
+      <div class="hero__mock">
+        <div class="mock" role="group" aria-label="JO-AIClient 对话界面示意">
+          <div class="mock__bar">
+            <span class="mock__dots" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="mock__title">JO-AIClient — 对话</span>
+            <span class="mock__badge">界面示意</span>
+          </div>
+
+          <div class="mock__body">
+
+            <!-- 左：会话侧栏 -->
+            <aside class="mock__side" aria-label="会话列表示意">
+              <div class="side__brand">
+                <span class="side__mark" aria-hidden="true">J</span>
+                <span>JO-AIClient</span>
+              </div>
+              <ul class="side__list" id="sideList">
+                <li class="side__item is-active" data-session="1">
+                  <button type="button" class="side__btn" data-q="1">
+                    <span class="side__t">用 Dart 写一个快速排序</span>
+                    <span class="side__m">3 个分支 · 刚刚</span>
+                  </button>
+                </li>
+                <li class="side__item" data-session="2">
+                  <button type="button" class="side__btn" data-q="2">
+                    <span class="side__t">重构 Flutter 状态管理方案</span>
+                    <span class="side__m">3 个分支 · 昨天</span>
+                  </button>
+                </li>
+                <li class="side__item" data-session="3">
+                  <span class="side__btn side__btn--static">
+                    <span class="side__t">对比三种排序算法</span>
+                    <span class="side__m">单链 · 3 天前</span>
+                  </span>
+                </li>
+                <li class="side__item" data-session="4">
+                  <span class="side__btn side__btn--static">
+                    <span class="side__t">整理会议纪要</span>
+                    <span class="side__m">单链 · 上周</span>
+                  </span>
+                </li>
+              </ul>
+              <p class="side__foot"><span class="dot dot--ok" aria-hidden="true"></span>SQLite · 本地存储</p>
+            </aside>
+
+            <!-- 中：对话区 -->
+            <div class="mock__chat">
+              <div class="chat__switch">
+                <span class="chat__switchlabel" id="qLabel">示例问题</span>
+                <div class="seg seg--xs" role="group" aria-labelledby="qLabel">
+                  <button type="button" class="seg__b is-on" data-q="1" aria-pressed="true">Dart 快速排序</button>
+                  <button type="button" class="seg__b" data-q="2" aria-pressed="false">状态管理重构</button>
+                </div>
+              </div>
+
+              <div class="bubble bubble--user">
+                <span class="bubble__who">你</span>
+                <p class="bubble__text" id="heroQuestion">用 Dart 写一个快速排序，并解释分区逻辑。</p>
+              </div>
+
+              <div class="bubble bubble--ai">
+                <span class="bubble__who">JO-AIClient</span>
+                <div class="bubble__body" id="heroAnswer">
+                  <div class="branchpane" data-q="1" data-b="1" hidden>
+                    <pre><code>List&lt;int&gt; quickSort(List&lt;int&gt; a) {
+  if (a.length &lt;= 1) return a;
+  final pivot = a[a.length ~/ 2];
+  final lo = &lt;int&gt;[], eq = &lt;int&gt;[], hi = &lt;int&gt;[];
+  for (final x in a) {
+    if (x &lt; pivot) lo.add(x);
+    else if (x &gt; pivot) hi.add(x);
+    else eq.add(x);
+  }
+  return [...quickSort(lo), ...eq, ...quickSort(hi)];
+}</code></pre>
+                    <p>分区逻辑：取中间元素为基准，把序列切成“小于 / 等于 / 大于”三段，等于段一次落位，只递归两侧。读起来最直观，代价是每一层都新建列表。</p>
+                  </div>
+                  <div class="branchpane" data-q="1" data-b="2">
+                    <pre><code>void quickSort(List&lt;int&gt; a, [int lo = 0, int hi = -1]) {
+  hi = hi &lt; 0 ? a.length - 1 : hi;
+  if (lo &gt;= hi) return;
+  final pivot = a[hi];
+  var i = lo;
+  for (var j = lo; j &lt; hi; j++) {
+    if (a[j] &lt; pivot) {
+      final t = a[i]; a[i] = a[j]; a[j] = t; i++;
+    }
+  }
+  final t = a[i]; a[i] = a[hi]; a[hi] = t;
+  quickSort(a, lo, i - 1);
+  quickSort(a, i + 1, hi);
+}</code></pre>
+                    <p>分区逻辑（Lomuto）：以末尾元素为基准，<code>i</code> 左侧是已确认的“小于区”。扫描结束后把基准换到 <code>i</code>，此时基准已落在最终位置，左右两段各自递归。全程原地交换，没有额外列表分配。</p>
+                  </div>
+                  <div class="branchpane" data-q="1" data-b="3" hidden>
+                    <p>先给结论：生产代码里更推荐直接 <code>list.sort()</code>。如果一定要自己实现，注意三点：</p>
+                    <ul class="tight">
+                      <li><strong>基准选择</strong>：固定取末尾，在已排序输入上会退化成 O(n²)；取中位数或随机可规避。</li>
+                      <li><strong>相等元素</strong>：三路分区让等于基准的元素一次落位，重复值多的数据收益明显。</li>
+                      <li><strong>递归深度</strong>：先递归较短一侧、较长一侧改成循环，可把栈深度压到 O(log n)。</li>
+                    </ul>
+                    <p>分区做的事始终一样：把序列重排为“小于基准 | 等于基准 | 大于基准”，基准段所在位置就是它的最终位置。</p>
+                  </div>
+
+                  <div class="branchpane" data-q="2" data-b="1" hidden>
+                    <pre><code>class CounterModel extends ChangeNotifier {
+  int _value = 0;
+  int get value =&gt; _value;
+
+  void increment() {
+    _value++;
+    notifyListeners();
+  }
+}</code></pre>
+                    <p>思路：状态从 Widget 挪进 <code>ChangeNotifier</code>，Widget 只负责监听和渲染。测试直接实例化 Model 断言 <code>value</code>，不需要 <code>WidgetTester</code>。改造量最小，适合在现有代码上渐进迁移。</p>
+                  </div>
+                  <div class="branchpane" data-q="2" data-b="2" hidden>
+                    <pre><code>final counterProvider =
+    NotifierProvider&lt;CounterNotifier, int&gt;(CounterNotifier.new);
+
+class CounterNotifier extends Notifier&lt;int&gt; {
+  @override
+  int build() =&gt; 0;
+  void increment() =&gt; state++;
+}</code></pre>
+                    <p>思路：依赖关系由 provider 图声明，不再靠 <code>context</code> 层层传递，也不会在运行时才抛 <code>ProviderNotFoundException</code>。测试用 <code>ProviderContainer</code> 覆盖依赖，可以完全脱离 Widget 树验证业务逻辑。</p>
+                  </div>
+                  <div class="branchpane" data-q="2" data-b="3" hidden>
+                    <pre><code>sealed class CounterEvent {}
+class Increment extends CounterEvent {}
+
+class CounterBloc extends Bloc&lt;CounterEvent, int&gt; {
+  CounterBloc() : super(0) {
+    on&lt;Increment&gt;((_, emit) =&gt; emit(state + 1));
+  }
+}</code></pre>
+                    <p>思路：任何状态变更都必须经由事件，<code>emit</code> 序列可以用 <code>blocTest</code> 直接断言。约束最强、样板也最多，适合多人协作、需要追溯“状态是被哪个事件改的”的场景。</p>
+                  </div>
+                </div>
+
+                <div class="bubble__foot">
+                  <div class="branchctl">
+                    <button type="button" class="branchctl__b" id="heroPrev" aria-label="上一个分支">
+                      <svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true" focusable="false"><path d="M7.5 2 3.5 6l4 4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                    <span class="branchctl__label" id="heroBranchLabel">分支 2 / 3</span>
+                    <button type="button" class="branchctl__b" id="heroNext" aria-label="下一个分支">
+                      <svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true" focusable="false"><path d="M4.5 2l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                    <span class="pill">重新生成产生</span>
+                  </div>
+
+                  <div class="msgact">
+                    <button type="button" class="iconbtn" id="heroMenuBtn" aria-expanded="false" aria-controls="heroMenu" aria-label="消息操作菜单">
+                      <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" focusable="false"><circle cx="3.5" cy="8" r="1.4" fill="currentColor"/><circle cx="8" cy="8" r="1.4" fill="currentColor"/><circle cx="12.5" cy="8" r="1.4" fill="currentColor"/></svg>
+                    </button>
+                    <ul class="menu" id="heroMenu" hidden>
+                      <li><button type="button" data-act="regen">重新生成</button></li>
+                      <li><button type="button" data-act="delete-after">删除后续</button></li>
+                      <li><button type="button" data-act="delete-branch">删除当前分支</button></li>
+                      <li><button type="button" data-act="continue">从历史消息继续对话</button></li>
+                    </ul>
+                  </div>
+                </div>
+
+                <p class="chat__status" id="heroStatus" role="status">切换分支时，只有当前活动分支的内容会显示在对话区。</p>
+
+                <ol class="chat__steps" id="heroSteps" aria-label="当前示例问题对应的步骤">
+                  <li data-step="1"><span class="n">1</span><span class="s">首次生成回答 → 分支 1</span></li>
+                  <li data-step="2" class="is-current"><span class="n">2</span><span class="s">点击“重新生成”→ 分支 2</span></li>
+                  <li data-step="3"><span class="n">3</span><span class="s">再次“重新生成”→ 分支 3</span></li>
+                  <li data-step="4"><span class="n">4</span><span class="s">用 ◀ 分支 2 / 3 ▶ 切换，右侧消息树同步高亮</span></li>
+                </ol>
+              </div>
+            </div>
+
+            <!-- 右：消息树 -->
+            <aside class="mock__tree" aria-label="当前会话的消息树结构">
+              <h2 class="panel__h">消息树</h2>
+              <div class="tree" id="heroTree">
+                <ul>
+                  <li class="tli on-path" data-node="u1">
+                    <span class="trow"><span class="tdot tdot--user"></span><span class="tlabel">用户提问</span></span>
+                    <ul>
+                      <li class="tli on-path" data-node="forkA">
+                        <span class="trow">
+                          <span class="tdot tdot--fork"></span>
+                          <span class="tlabel">分叉点 A</span>
+                          <span class="tcount">3</span>
+                        </span>
+                        <ul>
+                          <li class="tli" data-branch="1">
+                            <span class="trow"><span class="tdot"></span><span class="tlabel">分支 1</span></span>
+                            <ul><li class="tli tli--empty"><span class="trow"><span class="tlabel">无后续消息</span></span></li></ul>
+                          </li>
+                          <li class="tli is-active on-path" data-branch="2">
+                            <span class="trow"><span class="tdot"></span><span class="tlabel">分支 2</span><span class="tnow">当前</span></span>
+                            <ul>
+                              <li class="tli on-path" data-node="u2">
+                                <span class="trow"><span class="tdot tdot--user"></span><span class="tlabel">用户追问</span></span>
+                                <ul>
+                                  <li class="tli on-path" data-node="forkB">
+                                    <span class="trow"><span class="tdot tdot--fork"></span><span class="tlabel">分叉点 B</span><span class="tcount">2</span></span>
+                                    <ul>
+                                      <li class="tli is-active" data-node="b2a"><span class="trow"><span class="tdot"></span><span class="tlabel">分支 1</span><span class="tnow">当前</span></span></li>
+                                      <li class="tli" data-node="b2b"><span class="trow"><span class="tdot"></span><span class="tlabel">分支 2</span></span></li>
+                                    </ul>
+                                  </li>
+                                </ul>
+                              </li>
+                            </ul>
+                          </li>
+                          <li class="tli" data-branch="3">
+                            <span class="trow"><span class="tdot"></span><span class="tlabel">分支 3</span></span>
+                            <ul><li class="tli tli--empty"><span class="trow"><span class="tlabel">无后续消息</span></span></li></ul>
+                          </li>
+                        </ul>
+                      </li>
+                    </ul>
+                  </li>
+                </ul>
+              </div>
+              <p class="panel__note">分支关系与分叉锚点持久化于 SQLite，界面默认只显示当前活动分支。</p>
+            </aside>
+
+          </div>
+        </div>
+        <p class="mock__caption">示意图仅呈现布局与信息结构，非应用实际界面。对话内容为演示数据。</p>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============ 01 产品能力 ============ -->
+  <section class="section" id="features" aria-labelledby="features-h">
+    <div class="container">
+      <header class="sec-head">
+        <span class="sec-num">01</span>
+        <h2 class="sec-title" id="features-h">产品能力</h2>
+        <p class="sec-sub">按来源分成两组：JO-AIClient 在上游之上新增的能力，以及从 Kelivo 继承下来的基础能力。</p>
+      </header>
+
+      <h3 class="group-h"><span class="group-h__tag">独有</span>JO-AIClient 独有功能</h3>
+      <div class="cards">
+
+        <article class="card card--own">
+          <h4 class="card__t">消息级上下文树</h4>
+          <ul class="card__list">
+            <li>消息分支创建、切换、重新生成、从历史消息继续对话</li>
+            <li>按树结构精确删除：删单条、删后续、删当前分支、删分叉节点</li>
+            <li>分支关系、分叉锚点、分支选择与活动分支历史完整存入 SQLite，聊天界面默认只显示当前活动分支</li>
+            <li>上下文树完整性保护：持久化前做结构校验并生成稳定指纹，异常时保留原始数据并提供诊断入口，不静默修复</li>
+          </ul>
+        </article>
+
+        <article class="card card--own">
+          <h4 class="card__t">无损导入</h4>
+          <ul class="card__list">
+            <li>Chatbox 全版本导入：1.22 以下走树形 JSON，1.22 起走 ZIP 备份，两条路都完整重建消息分支树，不把分叉对话线性化拍平成单链</li>
+            <li>DeepSeek 无损导入：按消息树完整重建，重新生成的备选回答与编辑历史产生的分叉全部保留，思维链、附件与联网搜索片段按原始数据保留</li>
+            <li>合并模式保留本地内容，覆盖模式只定点替换对应导入会话</li>
+          </ul>
+        </article>
+
+        <article class="card card--own">
+          <h4 class="card__t">备份与迁移</h4>
+          <ul class="card__list">
+            <li>本机设置（窗口大小位置、桌面快捷键、聊天字号）可选择随备份流转，按设备识别恢复</li>
+            <li>本地备份处理提示在导入导出时显示，任务结束自动退出</li>
+            <li>备份页可查看和清理已记录的设备</li>
+          </ul>
+        </article>
+
+        <article class="card card--own">
+          <h4 class="card__t">助手与供应商增强</h4>
+          <ul class="card__list">
+            <li>助手接入业务数据库，支持分组、批量选择、移动、删除、拖拽整理</li>
+            <li>DeepSeek 默认 Anthropic-compatible 通道与专项适配（余额与模型列表自动改道到 OpenAI 兼容端点）</li>
+            <li>头像裁剪、旋转、水平/垂直翻转，导出时保留变换</li>
+          </ul>
+        </article>
+
+        <article class="card card--own">
+          <h4 class="card__t">桌面与平台能力</h4>
+          <ul class="card__list">
+            <li>宽屏聊天区域拉宽开关（默认关闭）</li>
+            <li>JO-AIClient 更新检测（依次探测 JO-AIClient 与现有 JO-Kelivo 发布源）</li>
+            <li>用户数据目录入口（桌面端备份与恢复、存储空间页面）</li>
+            <li>Android 自适应刷新率开关（Android 11+，默认关闭即锁定最高刷新率）</li>
+            <li>Linux 应用自绘标题栏（不依赖窗口管理器，Windows/macOS 仍用系统原生标题栏）</li>
+          </ul>
+        </article>
+
+      </div>
+
+      <h3 class="group-h group-h--inherit">
+        <span class="group-h__tag group-h__tag--muted">继承</span>
+        继承自 Kelivo 的基础能力
+        <span class="base-badge">当前基座：Kelivo 1.3.0</span>
+      </h3>
+      <ul class="inherit">
+        <li><strong>多供应商支持</strong>：OpenAI、Google Gemini、Anthropic 等主流供应商，支持自定义请求头与请求体</li>
+        <li><strong>思考与推理控制</strong>：推理预算滑块、思考开关</li>
+        <li><strong>自定义助手与提示词变量</strong></li>
+        <li><strong>多模态输入</strong>：图片、文本文档、PDF、Word；长文本自动转附件，图片自动压缩</li>
+        <li><strong>Markdown 渲染</strong>：代码高亮、LaTeX 公式（含中文字体回退）、表格</li>
+        <li><strong>语音服务</strong>：系统语音与多家网络 TTS、可配置 ASR、朗读音频导出</li>
+        <li><strong>MCP 支持</strong>：Model Context Protocol 工具与 OAuth 授权，内置 fetch 工具</li>
+        <li><strong>网络搜索</strong>：集成二十余家搜索服务，并支持部分供应商内置搜索</li>
+        <li><strong>设备本地工具</strong>：日历、屏幕使用时长（Android）、当前位置（Android）、健康数据摘要、提醒事项、天气等</li>
+        <li><strong>自动重试</strong>：可配置等待策略，界面显示倒计时</li>
+        <li><strong>对话体验</strong>：会话单独指定模型、长回复分段气泡、气泡样式自定义、会话批量操作</li>
+        <li><strong>记忆系统</strong>：记忆提取、管理、上下文注入与策略配置</li>
+        <li><strong>数据备份</strong>：本地数据库快照恢复点、WebDAV / S3 云备份</li>
+        <li><strong>持久化</strong>：SQLite / Drift 存储聊天、消息分支与结构化附件</li>
+        <li><strong>其他</strong>：二维码分享供应商配置、自定义字体、启动故障自救、账号登录（ChatGPT、Grok、Kimi Code、Claude 等）</li>
+        <li><strong>设置与调度</strong>：设置搜索、世界书定时生效、手机端 MCP 绑定工作区</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ============ 02 与 Kelivo 的关系 ============ -->
+  <section class="section section--alt" id="kelivo" aria-labelledby="kelivo-h">
+    <div class="container">
+      <header class="sec-head">
+        <span class="sec-num">02</span>
+        <h2 class="sec-title" id="kelivo-h">与 Kelivo 的关系</h2>
+        <p class="sec-sub">JO-AIClient 是 Kelivo 的下游改版。这里说清楚改了什么、没改什么、以及哪些问题应该回到上游解决。</p>
+      </header>
+
+      <div class="rel">
+        <article class="rel__item">
+          <h3 class="rel__t">上游基座</h3>
+          <p>当前基座为 <strong>Kelivo 1.3.0</strong>，JO-AIClient 与上游保持同步。</p>
+        </article>
+
+        <article class="rel__item">
+          <h3 class="rel__t">应用身份已独立化</h3>
+          <p>应用名称、包名、安装器标识、数据目录、更新源、构建产物名均已独立。</p>
+          <ul class="rel__list">
+            <li>可与原版 Kelivo 并存安装</li>
+            <li>双方不会读取彼此的运行时数据</li>
+          </ul>
+        </article>
+
+        <article class="rel__item">
+          <h3 class="rel__t">致谢与版权</h3>
+          <p>感谢 Kelivo 作者及贡献者的开源工作。原项目版权归原作者及贡献者所有。</p>
+          <p class="rel__lic">JO-AIClient 按 GNU AGPL-3.0 发布。</p>
+        </article>
+      </div>
+
+      <div class="notprov" aria-labelledby="notprov-h">
+        <h3 class="notprov__h" id="notprov-h">明确不提供</h3>
+        <ul class="notprov__list">
+          <li>
+            <span class="notprov__k">iOS / macOS</span>
+            <span class="notprov__v">不支持。README 明确建议这类用户使用 Kelivo。</span>
+          </li>
+          <li>
+            <span class="notprov__k">HarmonyOS NEXT</span>
+            <span class="notprov__v">不支持。建议使用 kelivo-ohos。</span>
+          </li>
+          <li>
+            <span class="notprov__k">赞助商栏目</span>
+            <span class="notprov__v">未保留上游的赞助商栏目与推广位。</span>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 03 平台下载 ============ -->
+  <section class="section" id="download" aria-labelledby="download-h">
+    <div class="container">
+      <header class="sec-head">
+        <span class="sec-num">03</span>
+        <h2 class="sec-title" id="download-h">平台与下载</h2>
+        <p class="sec-sub">
+          全部发布文件位于
+          <a href="https://github.com/JO-Beacon/JO-Kelivo/releases" rel="noopener">JO-Beacon/JO-Kelivo 的 Releases 页</a>，
+          每个发布文件附带同名 <code>.sha256</code> 校验文件。
+        </p>
+      </header>
+
+      <div class="dl">
+        <article class="dl__row">
+          <div class="dl__head">
+            <h3 class="dl__p">Android</h3>
+          </div>
+          <ul class="dl__files">
+            <li><code>arm64-v8a</code></li>
+            <li><code>armeabi-v7a</code></li>
+            <li><code>x86_64</code></li>
+          </ul>
+          <a class="dl__go" href="https://github.com/JO-Beacon/JO-Kelivo/releases" rel="noopener">前往 Releases<span aria-hidden="true">→</span></a>
+        </article>
+
+        <article class="dl__row">
+          <div class="dl__head">
+            <h3 class="dl__p">Windows <span class="dl__arch">AMD64</span></h3>
+          </div>
+          <ul class="dl__files">
+            <li>中文安装程序</li>
+            <li>免安装便携版</li>
+            <li class="dl__inc">随包附带 VC++ 运行库</li>
+          </ul>
+          <a class="dl__go" href="https://github.com/JO-Beacon/JO-Kelivo/releases" rel="noopener">前往 Releases<span aria-hidden="true">→</span></a>
+        </article>
+
+        <article class="dl__row">
+          <div class="dl__head">
+            <h3 class="dl__p">Windows <span class="dl__arch">ARM64</span></h3>
+            <p class="dl__since">原生 ARM64，自 0.1.16 起提供</p>
+          </div>
+          <ul class="dl__files">
+            <li>中文安装程序</li>
+            <li>免安装便携版</li>
+          </ul>
+          <a class="dl__go" href="https://github.com/JO-Beacon/JO-Kelivo/releases" rel="noopener">前往 Releases<span aria-hidden="true">→</span></a>
+        </article>
+
+        <article class="dl__row">
+          <div class="dl__head">
+            <h3 class="dl__p">Linux <span class="dl__arch">AMD64</span></h3>
+          </div>
+          <ul class="dl__files">
+            <li><code>AppImage</code></li>
+            <li><code>.deb</code></li>
+            <li><code>.tar.gz</code></li>
+          </ul>
+          <a class="dl__go" href="https://github.com/JO-Beacon/JO-Kelivo/releases" rel="noopener">前往 Releases<span aria-hidden="true">→</span></a>
+        </article>
+      </div>
+
+      <div class="note">
+        <h3 class="note__h">关于 Windows 的 VC++ 运行库</h3>
+        <p>
+          安装程序与便携版都已随包附带运行库，正常安装即可使用。
+          只有当你把程序文件单独拷贝到另一台电脑，或者系统运行库被破坏时，才需要按系统架构匹配补装 VC++ 运行库，
+          可从微软官方页面下载：
+          <a href="https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist" rel="noopener">Latest supported Visual C++ Redistributable downloads</a>。
+        </p>
+      </div>
+
+      <p class="dl__missing">iOS / macOS 与 HarmonyOS NEXT 不在发布范围内，请见<a href="#kelivo">“与 Kelivo 的关系”</a>。</p>
+    </div>
+  </section>
+
+  <!-- ============ 04 交互演示 ============ -->
+  <section class="section section--alt" id="demo" aria-labelledby="demo-h">
+    <div class="container">
+      <header class="sec-head">
+        <span class="sec-num">04</span>
+        <h2 class="sec-title" id="demo-h">交互演示</h2>
+        <p class="sec-sub">两个可切换的本地演示，逐步展示分支切换与导入过程。全部在页面内运行，不连接任何服务。</p>
+      </header>
+
+      <div class="demo">
+        <div class="demo__picker seg" role="group" aria-label="选择演示示例">
+          <button type="button" class="seg__b is-on" data-demo="a" aria-pressed="true">示例 A · 消息分支切换</button>
+          <button type="button" class="seg__b" data-demo="b" aria-pressed="false">示例 B · 导入不拍平</button>
+        </div>
+
+        <p class="sr-only" id="demoAnnounce" role="status" aria-live="polite"></p>
+
+        <div class="demo__body">
+          <div class="demo__stage" id="demoStage"></div>
+
+          <aside class="demo__side" aria-labelledby="demoStepsH">
+            <h3 class="demo__sideh" id="demoStepsH">演示步骤</h3>
+            <ol class="steplist" id="demoSteps"></ol>
+            <div class="demo__nav">
+              <button type="button" class="btn btn--ghost btn--sm" id="demoPrev">上一步</button>
+              <button type="button" class="btn btn--primary btn--sm" id="demoNext">下一步</button>
+              <span class="demo__count" id="demoCount">1 / 4</span>
+            </div>
+          </aside>
+        </div>
+
+        <p class="demo__fine">
+          以上对话内容与导入数据均为演示，用于展示交互方式。实际使用时，操作的是你自己的会话与备份文件。
+        </p>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="container foot">
+    <div class="foot__brand">
+      <span class="brand__mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32" width="22" height="22" focusable="false">
+          <path d="M19 7v12a5.5 5.5 0 0 1-5.5 5.5A5.5 5.5 0 0 1 8.8 22" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>
+          <circle cx="23" cy="10.5" r="2.1" fill="currentColor"/>
+        </svg>
+      </span>
+      <span>JO-AIClient</span>
+    </div>
+    <p class="foot__line">
+      一个 AI 聊天助手，基于 Kelivo 的非官方改版，按 GNU AGPL-3.0 发布。
+      不代表原版作者发布、维护或背书。原项目版权归原作者及贡献者所有。
+    </p>
+    <nav class="foot__nav" aria-label="页脚导航">
+      <a href="https://github.com/JO-Beacon/JO-Kelivo" rel="noopener">仓库 JO-Beacon/JO-Kelivo</a>
+      <a href="https://github.com/JO-Beacon/JO-Kelivo/releases" rel="noopener">Releases</a>
+      <a href="#features">产品能力</a>
+      <a href="#kelivo">与 Kelivo 的关系</a>
+    </nav>
+  </div>
+</footer>
+
+<noscript>
+  <p class="noscript container">“交互演示”区块需要启用 JavaScript。页面其余内容（产品能力、与 Kelivo 的关系、平台下载）均可正常阅读。</p>
+</noscript>
+
+<script src="app.js" defer></script>
+</body>
+</html>
