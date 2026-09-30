@@ -157,10 +157,8 @@ class UpdateProvider extends ChangeNotifier {
     : _httpClient = httpClient ?? http.Client(),
       _ownsHttpClient = httpClient == null;
 
-  static const _joAiClientReleaseUrl =
+  static const _releaseUrl =
       'https://api.github.com/repos/JO-Beacon/JO-AIClient/releases/latest';
-  static const _joKelivoReleaseUrl =
-      'https://api.github.com/repos/JO-Beacon/JO-Kelivo/releases/latest';
   static const _githubHeaders = {
     'Accept': 'application/vnd.github+json',
     'X-GitHub-Api-Version': '2022-11-28',
@@ -182,16 +180,9 @@ class UpdateProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
     try {
-      final joAiClientRelease = await _probeJoAiClientRelease();
-      if (joAiClientRelease != null) {
-        _available = joAiClientRelease;
-        return;
-      }
-
       final info = await _fetchLatestRelease(
-        url: _joKelivoReleaseUrl,
+        url: _releaseUrl,
         appName: 'JO-AIClient',
-        assetAppName: 'JO-AIClient',
       );
 
       final pkg = await PackageInfo.fromPlatform();
@@ -206,24 +197,6 @@ class UpdateProvider extends ChangeNotifier {
     } finally {
       _checking = false;
       notifyListeners();
-    }
-  }
-
-  Future<UpdateInfo?> _probeJoAiClientRelease() async {
-    try {
-      final info = await _fetchLatestRelease(
-        url: _joAiClientReleaseUrl,
-        appName: 'JO-AIClient',
-      );
-      if (info.bestDownloadUrl() == null) {
-        debugPrint('[UpdateProvider] JO-AIClient 预埋更新路径尚无当前平台资产');
-        return null;
-      }
-      return info;
-    } catch (error) {
-      // 预埋迁移入口尚未启用时允许静默回落到现有 JO-Kelivo 更新源。
-      debugPrint('[UpdateProvider] JO-AIClient 预埋更新路径不可用：$error');
-      return null;
     }
   }
 

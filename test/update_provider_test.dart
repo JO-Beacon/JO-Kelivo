@@ -20,7 +20,8 @@ void main() {
   test('GitHub release parser keeps only supported JO-AIClient assets', () {
     final info = UpdateInfo.fromGitHubRelease({
       'tag_name': 'v0.1.6',
-      'html_url': 'https://github.com/JO-Beacon/JO-Kelivo/releases/tag/v0.1.6',
+      'html_url':
+          'https://github.com/JO-Beacon/JO-AIClient/releases/tag/v0.1.6',
       'published_at': '2026-08-13T00:00:00Z',
       'body': 'notes',
       'assets': [
@@ -40,7 +41,7 @@ void main() {
     expect(info.version, '0.1.6');
     expect(
       info.releaseUrl,
-      'https://github.com/JO-Beacon/JO-Kelivo/releases/tag/v0.1.6',
+      'https://github.com/JO-Beacon/JO-AIClient/releases/tag/v0.1.6',
     );
     expect(info.downloads, {
       'android': _url('JO-AIClient-v0.1.6+6-android-arm64-v8a-release.apk'),
@@ -178,95 +179,57 @@ void main() {
     );
   });
 
+  test('detects a newer release from the only release source', () async {
+    final requestedPaths = <String>[];
+    final provider = UpdateProvider(
+      httpClient: MockClient((request) async {
+        requestedPaths.add(request.url.path);
+        return _releaseResponse(appName: 'JO-AIClient', version: '99.0.0+1');
+      }),
+    );
+    addTearDown(provider.dispose);
+
+    await provider.checkForUpdates();
+
+    expect(provider.error, isNull);
+    expect(provider.available?.app, 'JO-AIClient');
+    expect(provider.available?.version, '99.0.0+1');
+    // 只有一个发布源：不应出现第二次请求。
+    expect(requestedPaths, ['/repos/JO-Beacon/JO-AIClient/releases/latest']);
+  });
+
   test(
-    'JO-AIClient release bypasses version comparison and short-circuits fallback',
+    'release without a current-platform asset still reports the version',
     () async {
       final requestedPaths = <String>[];
       final provider = UpdateProvider(
         httpClient: MockClient((request) async {
           requestedPaths.add(request.url.path);
-          if (request.url.path.contains('/JO-AIClient/')) {
-            return _releaseResponse(appName: 'JO-AIClient', version: '0.0.1+1');
-          }
-          fail('JO-Kelivo fallback must not run after JO-AIClient succeeds');
+          return http.Response(
+            jsonEncode({
+              'tag_name': 'v99.0.0+1',
+              'assets': [_asset('JO-AIClient-v99.0.0+1-source.zip')],
+            }),
+            200,
+          );
         }),
       );
       addTearDown(provider.dispose);
 
       await provider.checkForUpdates();
 
+      // 界面在拿不到本平台安装包时不会显示更新横幅；此处不做资产过滤。
       expect(provider.error, isNull);
-      expect(provider.available?.app, 'JO-AIClient');
-      expect(provider.available?.version, '0.0.1+1');
-      expect(requestedPaths, ['/repos/JO-Beacon/JO-AIClient/releases/latest']);
+      expect(provider.available?.version, '99.0.0+1');
+      expect(requestedPaths, hasLength(1));
     },
   );
 
-  test('JO-AIClient failure is silent and falls back to JO-Kelivo', () async {
-    final requestedPaths = <String>[];
+  test('a failing release source is reported', () async {
     final provider = UpdateProvider(
-      httpClient: MockClient((request) async {
-        requestedPaths.add(request.url.path);
-        if (request.url.path.contains('/JO-AIClient/')) {
-          return http.Response('not found', 404);
-        }
-        return _releaseResponse(
-          appName: 'JO-Kelivo',
-          assetAppName: 'JO-AIClient',
-          version: '10.0.0+1',
-        );
-      }),
-    );
-    addTearDown(provider.dispose);
-
-    await provider.checkForUpdates();
-
-    expect(provider.error, isNull);
-    expect(provider.available?.app, 'JO-AIClient');
-    expect(requestedPaths, [
-      '/repos/JO-Beacon/JO-AIClient/releases/latest',
-      '/repos/JO-Beacon/JO-Kelivo/releases/latest',
-    ]);
-  });
-
-  test('JO-AIClient release without supported assets falls back', () async {
-    final requestedPaths = <String>[];
-    final provider = UpdateProvider(
-      httpClient: MockClient((request) async {
-        requestedPaths.add(request.url.path);
-        if (request.url.path.contains('/JO-AIClient/')) {
-          return http.Response(
-            jsonEncode({
-              'tag_name': 'v0.0.1+1',
-              'assets': [_asset('JO-AIClient-v0.0.1+1-source.zip')],
-            }),
-            200,
-          );
-        }
-        return _releaseResponse(
-          appName: 'JO-Kelivo',
-          assetAppName: 'JO-AIClient',
-          version: '10.0.0+1',
-        );
-      }),
-    );
-    addTearDown(provider.dispose);
-
-    await provider.checkForUpdates();
-
-    expect(provider.error, isNull);
-    expect(provider.available?.app, 'JO-AIClient');
-    expect(requestedPaths, hasLength(2));
-  });
-
-  test('only JO-Kelivo failure is exposed when both paths fail', () async {
-    final provider = UpdateProvider(
-      httpClient: MockClient((request) async {
-        if (request.url.path.contains('/JO-AIClient/')) {
-          return http.Response('not found', 404);
-        }
-        return http.Response('unavailable', 503);
-      }),
+      httpClient: MockClient(
+        (request) async => http.Response('unavailable', 503),
+      ),
     );
     addTearDown(provider.dispose);
 
@@ -274,7 +237,6 @@ void main() {
 
     expect(provider.available, isNull);
     expect(provider.error, contains('HTTP 503'));
-    expect(provider.error, isNot(contains('404')));
   });
 }
 
@@ -288,11 +250,8 @@ String _url(String name) => 'https://example.invalid/$name';
 http.Response _releaseResponse({
   required String appName,
   required String version,
-  String? assetAppName,
 }) {
-  // 仓库名与资产前缀在回落路径上并不相同：仓库仍是 JO-Kelivo，
-  // 而资产按 JO-AIClient 前缀匹配，因此两者分开传。
-  final assetPrefix = assetAppName ?? appName;
+  final assetPrefix = appName;
   return http.Response(
     jsonEncode({
       'tag_name': 'v$version',

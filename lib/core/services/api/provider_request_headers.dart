@@ -3,7 +3,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../providers/settings_provider.dart';
 
-const String _openRouterAppReferer = 'https://github.com/JO-Beacon/JO-Kelivo';
+const String _openRouterAppReferer = 'https://github.com/JO-Beacon/JO-AIClient';
 const String _openRouterAppTitle = 'JO-AIClient';
 const String _openRouterAppCategories = 'general-chat';
 

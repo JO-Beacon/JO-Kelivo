@@ -215,14 +215,14 @@ class _DesktopAboutPaneState extends State<DesktopAboutPane> {
                     svgAsset: 'assets/icons/github.svg',
                     label: l10n.aboutPageGithub,
                     onTap: () =>
-                        _openUrl('https://github.com/JO-Beacon/JO-Kelivo'),
+                        _openUrl('https://github.com/JO-Beacon/JO-AIClient'),
                   ),
                   const _DeskRowDivider(),
                   _DeskNavRow(
                     icon: lucide.Lucide.FileText,
                     label: l10n.aboutPageLicense,
                     onTap: () => _openUrl(
-                      'https://github.com/JO-Beacon/JO-Kelivo/blob/main/LICENSE',
+                      'https://github.com/JO-Beacon/JO-AIClient/blob/main/LICENSE',
                     ),
                   ),
                 ],

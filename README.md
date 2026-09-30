@@ -11,10 +11,10 @@
 
 **Windows 用户必看**：安装包和便携包已经**随包附带**所需的 VC++ 运行库，正常下载安装即可，不需要另外安装。只有当你**单独拷贝程序文件**到其它电脑、或系统运行库被破坏时，才需要按系统匹配补装：普通 x64 电脑装 [64 位版](https://aka.ms/vc14/vc_redist.x64.exe)，ARM 电脑（Windows on ARM）装 [ARM64 版](https://aka.ms/vc14/vc_redist.arm64.exe)，也可从[微软官网](https://learn.microsoft.com/zh-cn/cpp/windows/latest-supported-vc-redist?view=msvc-180#latest-supported-redistributable-version)手动下载。
 
-- ✅ **[Android](https://github.com/JO-Beacon/JO-Kelivo/releases/latest)**（提供 arm64-v8a、armeabi-v7a、x86_64 三个安装包）
-- ✅ **[Windows AMD64](https://github.com/JO-Beacon/JO-Kelivo/releases/latest)**（中文安装程序与免安装便携版均提供）
-- ✅ **[Windows ARM64](https://github.com/JO-Beacon/JO-Kelivo/releases/latest)**（原生 ARM64，中文安装程序与免安装便携版均提供，`0.1.16` 起；x64 安装包也可直接装进 ARM 电脑）
-- ✅ **[Linux AMD64](https://github.com/JO-Beacon/JO-Kelivo/releases/latest)**（AppImage、deb、tar.gz）
+- ✅ **[Android](https://github.com/JO-Beacon/JO-AIClient/releases/latest)**（提供 arm64-v8a、armeabi-v7a、x86_64 三个安装包）
+- ✅ **[Windows AMD64](https://github.com/JO-Beacon/JO-AIClient/releases/latest)**（中文安装程序与免安装便携版均提供）
+- ✅ **[Windows ARM64](https://github.com/JO-Beacon/JO-AIClient/releases/latest)**（原生 ARM64，中文安装程序与免安装便携版均提供，`0.1.16` 起；x64 安装包也可直接装进 ARM 电脑）
+- ✅ **[Linux AMD64](https://github.com/JO-Beacon/JO-AIClient/releases/latest)**（AppImage、deb、tar.gz）
 - ❌ iOS / macOS（暂无计划，可使用 [Kelivo](https://github.com/Chevey339/kelivo)）
 - ❌ HarmonyOS NEXT（暂无计划，可使用 [kelivo-ohos](https://github.com/Chevey339/kelivo-ohos)）
 
@@ -54,7 +54,7 @@
 
 - **应用身份独立化** - JO-AIClient 与 [Kelivo](https://github.com/Chevey339/kelivo) 使用不同应用标识和数据目录，可并存安装和使用。
 - **宽屏聊天区域拉宽** - 可在平板、桌面或手机横屏等宽屏布局中让消息列表和输入栏尽量占满可用宽度；默认关闭。
-- **JO-AIClient 更新检测** - 新版本检查依次探测 JO-AIClient 和现有 JO-Kelivo 发布源，并按当前平台匹配可下载安装包。
+- **JO-AIClient 更新检测** - 新版本检查会从发布源按当前平台匹配可下载安装包。
 - **用户数据目录入口** - 桌面端备份与恢复、存储空间页面提供打开用户数据目录入口，方便定位聊天数据和文件操作。
 
 ## 平台能力
@@ -162,9 +162,9 @@
 
 <a href="https://www.star-history.com/?type=date&repos=JO-Beacon%2FJO-Kelivo">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=JO-Beacon/JO-Kelivo&type=date&theme=dark&legend=top-left&sealed_token=cviwNfwHCNCz1YqYCFNDyNSGtySn160KcyFzHuXfrwvxZs98E2ogX9uhHzJQ0IuzVT9NqXi_kd_0lpeIxd43zfHRFwJ5s4m0iVBNchoUCp6IKgWUKcbUf94uBRQhtaY--oO9WsM5uULEmMBWF_nkj5W8YjOiFLkwm97i3Ioh1u9YzU41NAmN94wov_RK" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=JO-Beacon/JO-Kelivo&type=date&legend=top-left&sealed_token=cviwNfwHCNCz1YqYCFNDyNSGtySn160KcyFzHuXfrwvxZs98E2ogX9uhHzJQ0IuzVT9NqXi_kd_0lpeIxd43zfHRFwJ5s4m0iVBNchoUCp6IKgWUKcbUf94uBRQhtaY--oO9WsM5uULEmMBWF_nkj5W8YjOiFLkwm97i3Ioh1u9YzU41NAmN94wov_RK" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=JO-Beacon/JO-Kelivo&type=date&legend=top-left&sealed_token=cviwNfwHCNCz1YqYCFNDyNSGtySn160KcyFzHuXfrwvxZs98E2ogX9uhHzJQ0IuzVT9NqXi_kd_0lpeIxd43zfHRFwJ5s4m0iVBNchoUCp6IKgWUKcbUf94uBRQhtaY--oO9WsM5uULEmMBWF_nkj5W8YjOiFLkwm97i3Ioh1u9YzU41NAmN94wov_RK" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=JO-Beacon/JO-AIClient&type=date&theme=dark&legend=top-left&sealed_token=cviwNfwHCNCz1YqYCFNDyNSGtySn160KcyFzHuXfrwvxZs98E2ogX9uhHzJQ0IuzVT9NqXi_kd_0lpeIxd43zfHRFwJ5s4m0iVBNchoUCp6IKgWUKcbUf94uBRQhtaY--oO9WsM5uULEmMBWF_nkj5W8YjOiFLkwm97i3Ioh1u9YzU41NAmN94wov_RK" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=JO-Beacon/JO-AIClient&type=date&legend=top-left&sealed_token=cviwNfwHCNCz1YqYCFNDyNSGtySn160KcyFzHuXfrwvxZs98E2ogX9uhHzJQ0IuzVT9NqXi_kd_0lpeIxd43zfHRFwJ5s4m0iVBNchoUCp6IKgWUKcbUf94uBRQhtaY--oO9WsM5uULEmMBWF_nkj5W8YjOiFLkwm97i3Ioh1u9YzU41NAmN94wov_RK" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=JO-Beacon/JO-AIClient&type=date&legend=top-left&sealed_token=cviwNfwHCNCz1YqYCFNDyNSGtySn160KcyFzHuXfrwvxZs98E2ogX9uhHzJQ0IuzVT9NqXi_kd_0lpeIxd43zfHRFwJ5s4m0iVBNchoUCp6IKgWUKcbUf94uBRQhtaY--oO9WsM5uULEmMBWF_nkj5W8YjOiFLkwm97i3Ioh1u9YzU41NAmN94wov_RK" />
  </picture>
 </a>
 
@@ -176,7 +176,7 @@
 
 # 联系我们
 
-- Issue: [GitHub Issues](https://github.com/JO-Beacon/JO-Kelivo/issues)
+- Issue: [GitHub Issues](https://github.com/JO-Beacon/JO-AIClient/issues)
 
 ---
 

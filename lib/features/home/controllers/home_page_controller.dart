@@ -1932,6 +1932,13 @@ class HomePageController extends ChangeNotifier {
     final savedMsg = await savedMessage;
     if (savedMsg == null) return;
 
+    // 编辑以部件为唯一事实来源。覆盖保存会原地改写同一条消息，但流控制器里
+    // 按消息 ID 缓存的推理 / 工具 / 切分状态仍是编辑前的；若不清掉，删掉
+    // 思维链部件后渲染会落到“实时推理”回退路径，表现为思维链已删除却还在
+    // 显示。另存为新分支 / 克隆子树的 ID 是新生成的，清掉也无害。丢弃后由
+    // 随后的 restoreMessageUiState 按持久化结果重建。
+    _streamController.clearMessageState(savedMsg.id);
+
     await _viewModel.refreshConversationTree(savedMsg.conversationId);
 
     if (await _chatController.openAroundPersistedMessage(savedMsg)) {

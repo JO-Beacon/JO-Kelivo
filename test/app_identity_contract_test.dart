@@ -142,10 +142,6 @@ void main() {
       () {
         _expectContains(
           'lib/core/providers/update_provider.dart',
-          'https://api.github.com/repos/JO-Beacon/JO-Kelivo/releases/latest',
-        );
-        _expectContains(
-          'lib/core/providers/update_provider.dart',
           'https://api.github.com/repos/JO-Beacon/JO-AIClient/releases/latest',
         );
         for (final path in [
@@ -154,7 +150,7 @@ void main() {
         ]) {
           _expectContains(path, "_upstreamKelivoVersion = '1.3.0'");
           _expectContains(path, "_upstreamKelivoBuildNumber = '79'");
-          _expectContains(path, 'https://github.com/JO-Beacon/JO-Kelivo');
+          _expectContains(path, 'https://github.com/JO-Beacon/JO-AIClient');
           _expectContains(path, 'https://github.com/Chevey339/kelivo');
         }
       },
