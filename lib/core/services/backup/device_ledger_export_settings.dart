@@ -4,9 +4,9 @@ import '../../database/business_settings_router.dart';
 import '../device/device_identity.dart';
 import 'local_device_settings_ledger.dart';
 
-/// 「带 / 不带」本机设置档位的记忆（存 SharedPreferences）。
+/// “带 / 不带”本机设置档位的记忆（存 SharedPreferences）。
 ///
-/// 首档初始为「不带」（= 今天行为，无推荐含义）。
+/// 首档初始为“不带”（= 今天行为，无推荐含义）。
 abstract final class DeviceLedgerExportSettings {
   DeviceLedgerExportSettings._();
 
@@ -31,7 +31,7 @@ class LedgerExportPayload {
     required this.localDeviceRecognized,
   });
 
-  /// `Map<包内条目名, JSON 字符串>`；空表示退化到「不带」的包结构。
+  /// `Map<包内条目名, JSON 字符串>`；空表示退化到“不带”的包结构。
   final Map<String, String> entries;
 
   /// 是否成功识别本机设备。
@@ -41,10 +41,10 @@ class LedgerExportPayload {
   final bool localDeviceRecognized;
 }
 
-/// 组装「带」档导出所需的册子内容。
+/// 组装“带”档导出所需的册子内容。
 ///
 /// 两种降级（条件与结果不同，不要混）：
-/// - 册子为空（一台设备记录都没有）→ entries 为空，退化为「不带」的包结构；
+/// - 册子为空（一台设备记录都没有）→ entries 为空，退化为“不带”的包结构；
 /// - 指纹采集失败但册子非空 → **仍然导出册子**（历史档案照常传递，扔掉
 ///   会打断累积链路），只是本机当前值无法刷新、不进包。
 abstract final class DeviceLedgerExportCollector {

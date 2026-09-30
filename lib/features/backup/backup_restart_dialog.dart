@@ -98,7 +98,7 @@ Future<void> showRestoreCompletionDialog(
   bool suppressAssociatedPathOnRestart = false,
   String? associatedBackupPath,
 }) async {
-  // 只有确实要展示设备记录时才去解析本机指纹（用于标注「（本机）」）。
+  // 只有确实要展示设备记录时才去解析本机指纹（用于标注“（本机）”）。
   // 指纹服务有进程内缓存，导出/恢复流程早已解析过，这里不会重复付出代价。
   final currentFingerprint = ledgerRecords.isEmpty
       ? null
@@ -161,10 +161,10 @@ Future<void> _showMergeNotice(
   );
 }
 
-/// 收尾弹窗的正文：若干提示行 + 「本机设置记录」纯展示区块。
+/// 收尾弹窗的正文：若干提示行 + “本机设置记录”纯展示区块。
 ///
 /// 区块只列出本次恢复在包内看到的设备记录（设备名 / 平台 / 时间 / 设置项数），
-/// 本机那一行带「（本机）」标注；不含任何交互控件——恢复控制已按模式自动决定。
+/// 本机那一行带“（本机）”标注；不含任何交互控件——恢复控制已按模式自动决定。
 class _RestoreCompletionContent extends StatelessWidget {
   const _RestoreCompletionContent({
     required this.lines,

@@ -236,7 +236,7 @@ void main() {
       role: 'user',
       content: 'hello',
     );
-    // 「切回原版本」依赖上游的 setSelectedVersion；本仓库活动分支由消息树
+    // “切回原版本”依赖上游的 setSelectedVersion；本仓库活动分支由消息树
     // 表达，该接口已废弃。历史改写改由 updateMessage 完成，故不再追加版本。
     reply = await chat.addMessage(
       conversationId: conversationId,

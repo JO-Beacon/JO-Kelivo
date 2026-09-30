@@ -8,10 +8,10 @@ import 'package:Kelivo/core/providers/assistant_provider.dart';
 
 import '../../support/business_preferences_test_harness.dart';
 
-/// 「全局思考预算」这一层已删除：思考档位只由助手拥有，`null` 等于「自动」。
+/// “全局思考预算”这一层已删除：思考档位只由助手拥有，`null` 等于“自动”。
 ///
 /// 备份里可能还带着旧键 `thinking_budget_v1`，恢复后必须被读一次、落到还没
-/// 有档位的助手上，然后清除，否则老数据的档位会静默变成「自动」。
+/// 有档位的助手上，然后清除，否则老数据的档位会静默变成“自动”。
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 

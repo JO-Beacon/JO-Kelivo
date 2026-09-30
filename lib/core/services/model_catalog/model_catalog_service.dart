@@ -19,7 +19,7 @@ const String kModelCatalogUpdateModePrefsKey = 'model_catalog_update_mode_v1';
 
 /// 目录更新的触发方式。
 enum ModelCatalogUpdateMode {
-  /// 只有用户点「立即更新」时才联网。
+  /// 只有用户点“立即更新”时才联网。
   manual,
 
   /// 启动时检查一次，数据超过 24 小时就自动更新。
@@ -30,6 +30,7 @@ enum ModelCatalogUpdateMode {
     return raw == daily.name ? daily : manual;
   }
 }
+
 const String kModelCatalogCacheFileName = 'models_dev.json';
 
 const Duration kModelCatalogStaleAfter = Duration(hours: 24);
@@ -169,6 +170,7 @@ class ModelCatalogService extends ChangeNotifier {
   String? get lastError => _lastError;
   DateTime? get generatedAt => _data?.generatedAt;
   bool get isBundled => _isBundled;
+
   /// 目录更新的触发方式。
   ModelCatalogUpdateMode get updateMode => _updateMode;
   int get providerCount => _data?.providers.length ?? 0;

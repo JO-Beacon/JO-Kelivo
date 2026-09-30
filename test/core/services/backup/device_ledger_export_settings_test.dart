@@ -9,7 +9,7 @@ import 'package:Kelivo/core/services/backup/restore_local_settings_applier.dart'
 
 void main() {
   group('DeviceLedgerExportSettings', () {
-    test('首档默认「不带」', () async {
+    test('首档默认“不带”', () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       expect(await DeviceLedgerExportSettings.includeLedger(), isFalse);
     });

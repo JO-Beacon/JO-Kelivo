@@ -224,7 +224,7 @@ void main() {
         ..writeAsBytesSync(bytes);
       final digest = sha256.convert(bytes).bytes;
 
-      // 不排除时找得到；把自己排除掉就只剩「没有别的」。
+      // 不排除时找得到；把自己排除掉就只剩“没有别的”。
       expect(
         await UploadDedupe.findIdenticalDigest(
           dir,

@@ -166,7 +166,7 @@ void main() {
   windowsTest('Dart does not show the window before the native first frame', (
     tester,
   ) async {
-    // 窗口必须由原生 runner 的「首帧门禁」显示。Dart 侧再调 show() 会抢在
+    // 窗口必须由原生 runner 的“首帧门禁”显示。Dart 侧再调 show() 会抢在
     // 首帧之前，正是白屏的成因。
     await initialize();
     expect(window.calls, isNot(contains('show')));

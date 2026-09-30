@@ -2148,7 +2148,7 @@ class _MessageListViewState extends State<MessageListView> {
         widget.siblingBranchIdsByMessageId[message.id] ?? const <String>[];
     final isBranchNode = widget.branchNodeMessageIds.contains(message.id);
     final useBranchSelector = siblingBranchIds.length > 1;
-    // §4.1 / §4.2：「删除此消息」与「删除此消息及后续」只适用于非分支节点。
+    // §4.1 / §4.2：“删除此消息”与“删除此消息及后续”只适用于非分支节点。
     final canDeleteMessageAndFollowing =
         !isBranchNode && widget.messageIdsWithChildren.contains(message.id);
     final selectedBranchIndex = useBranchSelector
@@ -2456,7 +2456,7 @@ class _MessageListViewState extends State<MessageListView> {
   }) {
     final isBranchNode = widget.branchNodeMessageIds.contains(message.id);
     final currentIdx = useBranchSelector ? selectedBranchIndex : 0;
-    // §4.5：「删除所有分支」必须是分支节点且必须不是叶子分支节点。
+    // §4.5：“删除所有分支”必须是分支节点且必须不是叶子分支节点。
     final canDeleteAllVersions =
         isBranchNode && widget.messageIdsWithChildren.contains(message.id);
     return ChatMessageWidget(

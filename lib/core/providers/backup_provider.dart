@@ -64,7 +64,7 @@ class BackupProvider extends ChangeNotifier {
     _message = null;
     notifyListeners();
     try {
-      // 云备份与导出本地备份共用同一「带本机设置」档位。
+      // 云备份与导出本地备份共用同一“带本机设置”档位。
       final ledgerEntries = await _resolveLedgerEntries(
         await DeviceLedgerExportSettings.includeLedger(),
       );
@@ -134,10 +134,10 @@ class BackupProvider extends ChangeNotifier {
 
   bool _lastLedgerUnrecognized = false;
 
-  /// 最近一次「带」档导出 / 云备份是否因指纹采集失败而没带上本机当前设置。
+  /// 最近一次“带”档导出 / 云备份是否因指纹采集失败而没带上本机当前设置。
   ///
-  /// 册子为空导致的退化为「不带」包结构不算——那种情况没有任何设备记录，
-  /// 提示没有意义。只有「册子非空、但本机值没刷新进包」才需要提醒用户。
+  /// 册子为空导致的退化为“不带”包结构不算——那种情况没有任何设备记录，
+  /// 提示没有意义。只有“册子非空、但本机值没刷新进包”才需要提醒用户。
   bool get lastLedgerUnrecognized => _lastLedgerUnrecognized;
 
   Future<File> exportToFile({
@@ -161,7 +161,7 @@ class BackupProvider extends ChangeNotifier {
 
   /// 按档位采集要随包携带的册子内容。
   ///
-  /// 返回 null 表示退化为「不带」包结构（档位关，或册子为空）。
+  /// 返回 null 表示退化为“不带”包结构（档位关，或册子为空）。
   /// 同时刷新 [lastLedgerUnrecognized]：指纹采集失败但册子非空时为 true。
   Future<Map<String, String>?> _resolveLedgerEntries(bool include) async {
     if (!include) {

@@ -89,7 +89,7 @@ class AssistantProvider extends ChangeNotifier {
     _rebuildAssistantIndex();
     _rebuildAssistantDirectory();
 
-    // 一次性迁移：老版本还有「全局思考预算」这一层，现在档位只由助手拥有。
+    // 一次性迁移：老版本还有“全局思考预算”这一层，现在档位只由助手拥有。
     //
     // 键不存在时（绝大多数启动）这里必须保持完全同步：助手列表要在首个
     // await 之前就绪，否则会破坏启动快照的同步恢复。只有真的存在这个废弃
@@ -169,9 +169,9 @@ class AssistantProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 已废弃的「全局思考预算」存储键。
+  /// 已废弃的“全局思考预算”存储键。
   ///
-  /// 该层级已删除：思考档位只由助手拥有，`null` 明确等于「自动」。这个键仍
+  /// 该层级已删除：思考档位只由助手拥有，`null` 明确等于“自动”。这个键仍
   /// 保留在 [BusinessKeyRegistry.preferenceKeys] 里，是为了让带它的老备份恢复
   /// 后还能被读一次、落到助手上；`_load()` 里那一段就是唯一的消费点。
   static const String _retiredGlobalThinkingBudgetKey = 'thinking_budget_v1';

@@ -14,7 +14,7 @@ Vertex 的事件入口、事件折叠、SQLite round-trip 和 HTTP 错误传播�
 
 ## 事件语义与生命周期
 
-`StreamChunk` 是 provider 无关的密封事件。文本 / 思考 / 图片按 **id** 定位，工具按 vendor tool-call id 定位。交错到达时不要「更新最后一个 part」。
+`StreamChunk` 是 provider 无关的密封事件。文本 / 思考 / 图片按 **id** 定位，工具按 vendor tool-call id 定位。交错到达时不要“更新最后一个 part”。
 
 | 系列 | Start | 增量 | 结束 | 备注 |
 |---|---|---|---|---|
@@ -70,7 +70,7 @@ UPDATE_STREAM_TRACES=true flutter test test/features/api/stream_trace_replay_tes
 
 ## 轨迹回放的盲区
 
-回放只覆盖「已经变成 `SseEvent` 的帧」。下面两类响应**不会**出现在 `events.jsonl` 里，改它们的解析时不要只靠快照变绿。
+回放只覆盖“已经变成 `SseEvent` 的帧”。下面两类响应**不会**出现在 `events.jsonl` 里，改它们的解析时不要只靠快照变绿。
 
 **非 SSE 的一次性 JSON。** `stream: false` 走 `generateContent` / 整包 Chat Completions JSON / Responses 非流对象，不经 `sse_framing`。`generateMessage` 仍用同一个 handler 合并，但 recorder 录不到这些包。Images API 也是一次 JSON，同样不在轨迹里。
 

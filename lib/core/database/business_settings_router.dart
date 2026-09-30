@@ -32,7 +32,7 @@ final class BusinessKeyRegistry {
     'flutter_log_enabled_v1',
     // 模型目录的联网更新方式，同样是本机偏好。
     // 不登记在这里会归入 unknownPreference，启动时的迁移清理会把它删掉，
-    // 表现成「设置改完下次启动就复原」。
+    // 表现成“设置改完下次启动就复原”。
     'model_catalog_update_mode_v1',
     // 本机设置档位开关自己也是本机设置：直写 SharedPreferences，不经业务库，
     // 必须随册子流转，否则换设备恢复后开关会静默回到默认值。

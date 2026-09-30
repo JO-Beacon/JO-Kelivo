@@ -8,7 +8,7 @@ import 'local_device_settings_ledger.dart';
 
 /// 把册子里记录的 10 个本机设置键写回本机。
 ///
-/// 这是唯一一处「把备份里的值落到 SharedPreferences」的地方，两个调用方：
+/// 这是唯一一处“把备份里的值落到 SharedPreferences”的地方，两个调用方：
 /// - 合并保留模式：恢复流程内**逐键补缺**（就地写回，不重启）；
 /// - 完全覆盖模式：冷重启后切库成功时**直接采纳**（在启动门里）。
 ///
@@ -32,7 +32,7 @@ abstract final class DeviceLocalSettingsWriter {
   /// 直接采纳：本机已有的同名设置项也一并被备份值覆盖。
   ///
   /// 返回实际写入的键数。这是完全覆盖模式的行为（用户 2026-09-10 确认），
-  /// 刻意与 [applyMissingOnly] 相区分，不要「顺手」统一。
+  /// 刻意与 [applyMissingOnly] 相区分，不要“顺手”统一。
   static Future<int> applyOverwrite(Map<String, Object?> values) async {
     final prefs = await SharedPreferences.getInstance();
     var written = 0;

@@ -174,7 +174,7 @@ void main() {
     usage.notifyListeners();
     await tester.pump();
     expect(tester.takeException(), isNull);
-    // 本仓库把「清空上下文」改成了可逆转的屏蔽/恢复，文案相应不同。
+    // 本仓库把“清空上下文”改成了可逆转的屏蔽/恢复，文案相应不同。
     await tester.ensureVisible(find.text('Temporarily Mask Context'));
     await tester.pumpAndSettle();
     expect(find.text('Temporarily Mask Context').hitTestable(), findsOneWidget);

@@ -143,7 +143,7 @@ class ChatApiService {
 
   /// 剔掉模型读不了的媒体引用，只删不支持的那几类。
   ///
-  /// 以前是按「不支持图片」整条媒体引用一起删，会把音频连坐删掉；
+  /// 以前是按“不支持图片”整条媒体引用一起删，会把音频连坐删掉；
   /// 模型支持音频但不支持图片时，音频必须留下来。
   static Future<List<Map<String, dynamic>>>
   _stripUnsupportedMediaInputsFromMessages(

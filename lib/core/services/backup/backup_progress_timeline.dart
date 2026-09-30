@@ -9,7 +9,7 @@ enum BackupProgressFlow { export, restore }
 
 /// 阶段在整条流水线里占的区间 [起点, 终点]，取值 0..1。
 ///
-/// 这些权重是**估算**，只用来把「当前处在哪一步、这一步走了多少」换算成
+/// 这些权重是**估算**，只用来把“当前处在哪一步、这一步走了多少”换算成
 /// 一条连续的总体进度条；它不代表字节数，也不用于任何业务判断。阶段内
 /// 没有可量化进度时，进度条停在区间起点，不向前编造。
 const Map<BackupPhase, (double, double)> _exportTimeline =
@@ -39,7 +39,7 @@ const Map<BackupPhase, (double, double)> _restoreTimeline =
       BackupPhase.finalizing: (0.97, 1.00),
     };
 
-/// 把「阶段 + 阶段内进度」换算成整条流水线的总体进度（0..1）。
+/// 把“阶段 + 阶段内进度”换算成整条流水线的总体进度（0..1）。
 ///
 /// [localFraction] 为 null 表示该阶段没有可量化的进度，此时返回区间起点；
 /// 阶段不在表中时返回 null，由调用方决定回退显示。

@@ -265,7 +265,7 @@ class ChatService extends ChangeNotifier {
     _conversationListRevision++;
   }
 
-  // 上下文修订号：只表示「进入模型上下文的结构」变了（增删消息、切版本、
+  // 上下文修订号：只表示“进入模型上下文的结构”变了（增删消息、切版本、
   // 改摘要、换模型/助手、改 MCP 选择…），流式增量不算。
   final Map<String, int> _contextRevisions = {};
   final Map<String, ValueNotifier<int>> _contextRevisionNotifiers = {};
@@ -1752,7 +1752,7 @@ class ChatService extends ChangeNotifier {
       }
       messages.add(message);
     }
-    // 只读扫描（如工作区「会话文件」面板翻页）不应把整段历史塞进时间线缓存。
+    // 只读扫描（如工作区“会话文件”面板翻页）不应把整段历史塞进时间线缓存。
     if (cacheInTimeline) {
       _cacheLoadedMessages(conversationId, messages);
       await _cacheMessageArtifacts(messages);
@@ -2400,7 +2400,7 @@ class ChatService extends ChangeNotifier {
       summary: conversation.summary,
       lastSummarizedMessageCount: conversation.lastSummarizedMessageCount,
       chatSuggestions: List<String>.of(conversation.chatSuggestions),
-      // 以下 5 个字段必须一并带上：本方法是「逐字段重建」Conversation，
+      // 以下 5 个字段必须一并带上：本方法是“逐字段重建”Conversation，
       // 漏掉任何一项都会在导入时静默丢失（见同文件测试用例的说明）。
       injectedMemoryHash: conversation.injectedMemoryHash,
       lastMemoryExtractedOrder: conversation.lastMemoryExtractedOrder,
@@ -3832,7 +3832,7 @@ class ChatService extends ChangeNotifier {
     _firstGroupIndicesCache[conversationId] = firstIndices;
     await _cacheMessageArtifacts(activeMessages);
     _touchMessageCache(conversationId);
-    // 活动路径的「消息 ID 序列」才是上下文结构：只有它变了才算上下文变化，
+    // 活动路径的“消息 ID 序列”才是上下文结构：只有它变了才算上下文变化，
     // 流式增量与纯读取都不会走到这里。
     var activeChanged =
         previousActiveIds == null ||
@@ -4147,7 +4147,7 @@ class ChatService extends ChangeNotifier {
     return Set<String>.unmodifiable(deletedIds);
   }
 
-  /// 批量「删除此分支节点」：分支节点目标收掉所属分叉的全部分支，
+  /// 批量“删除此分支节点”：分支节点目标收掉所属分叉的全部分支，
   /// 仅保留活动血脉（契约 §4.4 修订）；非分支节点目标删除消息本身。
   Future<Set<String>> deleteMessageNodes({
     required String conversationId,
@@ -4392,7 +4392,7 @@ class ChatService extends ChangeNotifier {
           durationMs: message.durationMs,
         ),
     ];
-    // 只有「分叉的是最后一条已完成的助手回复」时才把建议带过去；
+    // 只有“分叉的是最后一条已完成的助手回复”时才把建议带过去；
     // 更早的消息、别的版本都不该继承当前的建议。
     final suggestions =
         targetMessage.role == 'assistant' &&

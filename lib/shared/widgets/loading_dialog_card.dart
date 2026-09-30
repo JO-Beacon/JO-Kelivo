@@ -18,7 +18,7 @@ class LoadingDialogCard extends StatelessWidget {
   /// 0..1 的总体进度；为 null 时进度条退化为不确定的扫动动画。
   final double? progress;
 
-  /// 当前阶段的文字（例如「正在打包」）。有进度时显示在百分比旁边。
+  /// 当前阶段的文字（例如“正在打包”）。有进度时显示在百分比旁边。
   final String? phaseLabel;
 
   final VoidCallback? onCancel;

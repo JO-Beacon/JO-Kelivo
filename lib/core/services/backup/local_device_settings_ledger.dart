@@ -62,9 +62,9 @@ class DeviceSettingsRecord {
 
 /// 本机设置册子的读写服务。
 ///
-/// 册子是「数据」：App 永远不会把它当设置读。合并路径与业务库写栅栏
+/// 册子是“数据”：App 永远不会把它当设置读。合并路径与业务库写栅栏
 /// （runWithRestoreWriteFence）无关——它在业务库外的独立文件里，
-/// 不参与换库，无需「换库前暂存、换库后并回」的补救逻辑。
+/// 不参与换库，无需“换库前暂存、换库后并回”的补救逻辑。
 class LocalDeviceSettingsLedger {
   LocalDeviceSettingsLedger({DeviceLedgerDatabase? database})
     : _database = database ?? DeviceLedgerDatabase.open();

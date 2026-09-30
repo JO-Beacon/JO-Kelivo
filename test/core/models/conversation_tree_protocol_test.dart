@@ -203,7 +203,7 @@ void main() {
       () {
         // 场景：A 是分叉锚点，A→B1→C1 与 A→B2→C2 两条分支，
         // 当前活动分支是 B2 一侧（C2 在看）。
-        // 契约 §4.4 修订语义：对 B2「删除此分支节点」= 收掉 A 下
+        // 契约 §4.4 修订语义：对 B2“删除此分支节点”= 收掉 A 下
         // 所有分支子树（B1/C1/B2 全删），仅活动血脉 C2 重挂 A。
         var tree = ConversationTree.linear(
           conversationId: 'conversation',
@@ -231,7 +231,7 @@ void main() {
     test(
       'deleteMessageNode collapses the fork even when the active lineage is the sibling side',
       () {
-        // 活动分支在 B1 一侧时，对 B2「删除此分支节点」同样收掉
+        // 活动分支在 B1 一侧时，对 B2“删除此分支节点”同样收掉
         // 整个 A 分叉：B2/C2 删除，B1 的活动血脉 C1 重挂 A。
         var tree = ConversationTree.linear(
           conversationId: 'conversation',
@@ -290,7 +290,7 @@ void main() {
     test(
       'deleteMessageNodes collapses the fork per selected node and drops targets outside any active lineage',
       () {
-        // 多选统一为「删除此分支节点」语义（契约 §4.4 修订）：
+        // 多选统一为“删除此分支节点”语义（契约 §4.4 修订）：
         // 选中 B2 → 收 A 下全部分支、保留 C2 血脉；随后 C2 也在
         // 选中集合（无子可留）→ C2 一并删除。终态只剩 A。
         var tree = ConversationTree.linear(

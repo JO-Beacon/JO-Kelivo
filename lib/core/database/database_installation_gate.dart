@@ -403,7 +403,7 @@ final class DatabaseInstallationGate {
   /// 被 [rebuildFresh] 移开的数据库族，最新的在前。
   ///
   /// 每一个都是裸 SQLite 族：可能停在更旧的 schema 上，也可能还带着未回放的
-  /// 日志，所以这里一律不打开它们。这份清单是给一个「导出或还原它」的界面用
+  /// 日志，所以这里一律不打开它们。这份清单是给一个“导出或还原它”的界面用
   /// 的，而这两条路都走备份流水线，不直接读取文件本身。
   static Future<List<DisplacedDatabaseCopy>> listDisplacedDatabases({
     required Directory appDataDirectory,
@@ -469,7 +469,7 @@ final class DatabaseInstallationGate {
     }
     final prefix = '${AppDatabase.databaseFileName}$displacedDatabasePrefix';
     // 先删附属文件，最后删数据库本体。[listDisplacedDatabases] 只列出数据库
-    // 本体仍在的族，所以先删本体就会把「随后删除失败的附属文件」藏起来——留下
+    // 本体仍在的族，所以先删本体就会把“随后删除失败的附属文件”藏起来——留下
     // 用户再也够不着的残骸，而 [hasDisplacedDatabases] 仍报告它存在。
     for (final suffix in _databaseFamilySuffixes.reversed) {
       final file = File(p.join(appDataDirectory.path, '$prefix$stamp$suffix'));

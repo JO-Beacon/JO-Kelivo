@@ -128,7 +128,7 @@ void main() {
     onSend,
     ChatInputBarController? mediaController,
     bool longPasteAsFile = false,
-    // 允许调用方传入自己配好的 settings（用于测「开关／阈值被改动后」的行为）。
+    // 允许调用方传入自己配好的 settings（用于测“开关／阈值被改动后”的行为）。
     // 不传时按 longPasteAsFile 构造，与既有用例行为一致。
     SettingsProvider? settings,
   }) {

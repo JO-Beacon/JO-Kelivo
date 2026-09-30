@@ -477,7 +477,7 @@ void main() {
       },
     );
 
-    test('「带」档写入册子条目，「不带」档没有该条目', () async {
+    test('“带”档写入册子条目，“不带”档没有该条目', () async {
       const fingerprint = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
       const entryName = 'device_local_settings/$fingerprint.json';
       const ledgerJson =

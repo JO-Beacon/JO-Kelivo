@@ -538,7 +538,7 @@ Map<String, dynamic>? claudeOutputConfig(
   }
   if (_isClaudeThinkingAlwaysOnModel(modelId)) {
     // 自适应思考无法关闭。省略 effort 会默认 high，
-    // 因此界面「关闭」必须发送最低合法档位。
+    // 因此界面“关闭”必须发送最低合法档位。
     var effort = _claudeEffortForBudget(budget);
     if (effort == 'off') effort = 'low';
     // 这里不做档位替换：max 与 xhigh 原样发出，由供应商决定接受还是报错。

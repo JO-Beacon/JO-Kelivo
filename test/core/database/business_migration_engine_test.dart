@@ -101,7 +101,7 @@ void main() {
   test('设备本机键不会被迁移清理删掉', () async {
     // 模型目录的更新方式是本机偏好，必须留在 localOnly；
     // 否则它会被归为 unknownPreference，在启动清理里被删除，
-    // 表现成「设置改完下次启动就复原」。
+    // 表现成“设置改完下次启动就复原”。
     final legacy = FakeLegacyBusinessPreferences({
       'theme_mode_v1': 'dark',
       'model_catalog_update_mode_v1': 'daily',

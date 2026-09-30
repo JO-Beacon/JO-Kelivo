@@ -908,7 +908,7 @@ class AppDatabase extends _$AppDatabase {
     );
   }
 
-  /// 允许任意「已发布」schema 的执行器，供 drift 的迁移器运行。
+  /// 允许任意“已发布”schema 的执行器，供 drift 的迁移器运行。
   ///
   /// 只有 `SchemaMigrations` 可以用它。其余连接一律走 [_openExecutor]，
   /// 那条路径有自己的版本检查。

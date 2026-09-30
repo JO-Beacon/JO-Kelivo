@@ -11,7 +11,7 @@ import '../../../support/business_test_harness.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  // 与上游有意分歧：该开关默认开，所以这里点一下是「关」。
+  // 与上游有意分歧：该开关默认开，所以这里点一下是“关”。
   testWidgets('chat item display page toggles reasoning level badge', (
     tester,
   ) async {

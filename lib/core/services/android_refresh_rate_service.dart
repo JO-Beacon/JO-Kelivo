@@ -9,7 +9,7 @@ import 'package:flutter/services.dart';
 /// 的自适应路线。该功能只有 Android 11（API 30）起才有效，低于此版本
 /// 原生侧始终固定模式。
 abstract final class AndroidRefreshRateService {
-  /// 只存本机、随「本机设置」册子流转的偏好键。
+  /// 只存本机、随“本机设置”册子流转的偏好键。
   static const adaptiveKey = 'android_adaptive_refresh_rate_v1';
 
   static const MethodChannel _channel = MethodChannel('app.refresh_rate');

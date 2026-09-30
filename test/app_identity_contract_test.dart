@@ -47,7 +47,7 @@ void main() {
         'PRODUCT_BUNDLE_IDENTIFIER = io.github.jobeacon.joaiclient',
       );
       // 版权串逐字写死：年号与措辞都是明确决定，不随年份自动更新。
-      // 同时禁止回退到上游模板的「All rights reserved」——那是保留全部权利的表述，
+      // 同时禁止回退到上游模板的“All rights reserved”——那是保留全部权利的表述，
       // 与按 AGPL 发布相悖；本项目此前从上游模板继承了它，且年号比项目本身还早一年。
       _expectContains(
         'macos/Runner/Configs/AppInfo.xcconfig',

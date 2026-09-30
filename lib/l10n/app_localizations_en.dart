@@ -12892,7 +12892,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get scheduledTasksIOSDetail =>
-      'iOS background limits prevent Kelivo from waking at a set time to run a model. Instead, content is prepared while the app can run, and the system shows a notification at the scheduled time. Only the next occurrence is prepared. Preparation may not finish after leaving the app; reopen Kelivo to prepare subsequent occurrences.';
+      'iOS background limits prevent JO-AIClient from waking at a set time to run a model. Instead, content is prepared while the app can run, and the system shows a notification at the scheduled time. Only the next occurrence is prepared. Preparation may not finish after leaving the app; reopen JO-AIClient to prepare subsequent occurrences.';
 
   @override
   String get scheduledTasksContextPolicy => 'Conversation context';
@@ -12958,7 +12958,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get scheduledTasksReminderBody =>
-      'Your scheduled task is due. Open Kelivo to continue.';
+      'Your scheduled task is due. Open JO-AIClient to continue.';
 
   @override
   String get scheduledTasksResultBody => 'Your scheduled task result is ready.';
@@ -12972,7 +12972,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get scheduledTasksAllowPreparationTip =>
-      'Generate the next result before its scheduled time, while Kelivo can run. The result stays out of the chat until it is due. Preparation uses text only, without tools, attachments or custom request bodies. It may incur model charges.';
+      'Generate the next result before its scheduled time, while JO-AIClient can run. The result stays out of the chat until it is due. Preparation uses text only, without tools, attachments or custom request bodies. It may incur model charges.';
 
   @override
   String get scheduledTasksContextPolicyTip =>
@@ -12980,7 +12980,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get scheduledTasksPreparationWindowTip =>
-      'How far ahead of the scheduled time preparation may begin, up to 24 hours. For example, opening Kelivo at noon can prepare the next morning’s reminder. A larger window gives more chances to prepare, but the result may be less current. It does not change the scheduled time or guarantee background execution.';
+      'How far ahead of the scheduled time preparation may begin, up to 24 hours. For example, opening JO-AIClient at noon can prepare the next morning’s reminder. A larger window gives more chances to prepare, but the result may be less current. It does not change the scheduled time or guarantee background execution.';
 
   @override
   String get scheduledTasksPreparationAttemptsTip =>
@@ -12992,7 +12992,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get scheduledTasksUnavailableTip =>
-      'If no prepared result is available and the task cannot run when due, send a reminder or skip the occurrence. A reminder contains no generated answer and requires notifications to be enabled. If Kelivo is open when the task is due, it can run the task then.';
+      'If no prepared result is available and the task cannot run when due, send a reminder or skip the occurrence. A reminder contains no generated answer and requires notifications to be enabled. If JO-AIClient is open when the task is due, it can run the task then.';
 
   @override
   String get scheduledTasksNotifyTip =>

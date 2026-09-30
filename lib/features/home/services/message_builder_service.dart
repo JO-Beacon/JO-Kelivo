@@ -44,7 +44,7 @@ import '../../../utils/markdown_media_sanitizer.dart';
 import 'ocr_service.dart';
 
 /// §7.6 记忆前缀解析结果。
-/// [persistHash] 区分「不写哈希」与「写入 [hash]」。
+/// [persistHash] 区分“不写哈希”与“写入 [hash]”。
 /// 清空需要这个区分：当最后一条可见记忆消失时，本轮不注入任何内容，
 /// 但仍必须记录上下文中已无快照——即 null [hash] 而非不写入。
 typedef MemoryPrefixResolution = ({

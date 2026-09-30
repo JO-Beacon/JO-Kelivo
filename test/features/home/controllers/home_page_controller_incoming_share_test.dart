@@ -412,8 +412,8 @@ void main() {
     final key = GlobalKey<_HarnessState>();
     await tester.pumpWidget(_app(service, key));
     final state = key.currentState!;
-    // 本仓库没有「在输入框里编辑消息」这套机制（产品 09-16 明确不要上游那套，
-    // 编辑走自有面板）。这里要构造的前置状态只是「输入框里已有内容」，
+    // 本仓库没有“在输入框里编辑消息”这套机制（产品 09-16 明确不要上游那套，
+    // 编辑走自有面板）。这里要构造的前置状态只是“输入框里已有内容”，
     // 直接写入即可 —— 与下面另一个用例的写法一致。
     state.text.text = 'original draft';
     state.media.images.add('/upload/existing.png');

@@ -109,7 +109,7 @@ ModelDisplayInfo getModelDisplayInfo(
   Conversation? conversation,
   Assistant? assistant,
 }) {
-  // 关闭「每个对话独立模型」时，会话层整体跳过；会话上的设置仍然保留，
+  // 关闭“每个对话独立模型”时，会话层整体跳过；会话上的设置仍然保留，
   // 重新开启后依然生效。
   final pinned = settings.perChatModelEnabled ? conversation : null;
   final conversationProvider = pinned?.chatModelProvider;

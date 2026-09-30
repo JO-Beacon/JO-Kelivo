@@ -951,7 +951,7 @@ abstract final class MemoryTools {
       'content': {
         'type': 'string',
         'description': zh
-            ? '一条完整、自包含的第三人称陈述句，例如「用户偏好直接、可落地的中文说明」。不要使用「这个」「刚才」等指回本次对话的词。'
+            ? '一条完整、自包含的第三人称陈述句，例如“用户偏好直接、可落地的中文说明”。不要使用“这个”“刚才”等指回本次对话的词。'
             : 'One complete, self-contained third-person statement, e.g. "The user prefers direct, actionable explanations in Chinese." Avoid deictic words that refer back to this conversation.',
       },
     };
@@ -988,7 +988,7 @@ abstract final class MemoryTools {
       'function': {
         'name': memorySearchProfile,
         'description': zh
-            ? '搜索用户的长期记忆。当对话中提供的记忆摘要不够详细、被截断（标了 mode="summary"），或需要查找某个特定信息时使用。按关键词匹配，多个关键词之间是「且」关系。'
+            ? '搜索用户的长期记忆。当对话中提供的记忆摘要不够详细、被截断（标了 mode="summary"），或需要查找某个特定信息时使用。按关键词匹配，多个关键词之间是“且”关系。'
             : 'Search the user\'s long-term memory. Use when the in-conversation memory summary is incomplete, truncated (mode="summary"), or you need a specific fact. Keyword match; multiple keywords are ANDed.',
         'parameters': {
           'type': 'object',
@@ -1125,7 +1125,7 @@ abstract final class MemoryTools {
       'function': {
         'name': chatSearch,
         'description': zh
-            ? '在历史对话中按关键词搜索消息内容（仅当前助手的会话，以及没有归属助手的旧会话）。需要回忆之前聊过什么，或者用户提到「上次」「之前说的」「我们讨论过」时，优先使用这个工具。默认不搜索当前对话，因为当前对话的内容已经在上下文里。'
+            ? '在历史对话中按关键词搜索消息内容（仅当前助手的会话，以及没有归属助手的旧会话）。需要回忆之前聊过什么，或者用户提到“上次”“之前说的”“我们讨论过”时，优先使用这个工具。默认不搜索当前对话，因为当前对话的内容已经在上下文里。'
             : 'Search message content in this assistant\'s past conversations (and unowned older chats) by keywords. Prefer this when recalling prior discussion, or when the user mentions "last time", "earlier", or "we discussed". By default the current conversation is excluded because it is already in context.',
         'parameters': {
           'type': 'object',

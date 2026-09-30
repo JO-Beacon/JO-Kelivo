@@ -1731,7 +1731,7 @@ class StreamingState {
     return elapsed < 0 ? null : elapsed;
   }
 
-  /// 记录「首个真正的输出」出现的时间（文本、思考、工具入参或图片）。
+  /// 记录“首个真正的输出”出现的时间（文本、思考、工具入参或图片）。
   void recordFirstOutput(StreamChunk chunk) {
     if (firstTokenMs != null ||
         requestFinishedAt != null ||

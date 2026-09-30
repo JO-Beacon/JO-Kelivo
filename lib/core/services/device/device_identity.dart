@@ -10,7 +10,7 @@ import '../../../utils/platform_utils.dart';
 /// 本机设备身份。
 ///
 /// [fingerprintHash] 是原始硬件标识的 sha256 前 32 个十六进制字符，
-/// 属于单向散列，不存原文也不可反推；仅用于「同一台设备」的匹配。
+/// 属于单向散列，不存原文也不可反推；仅用于“同一台设备”的匹配。
 /// [displayName] 是给人看的电脑名称 / 手机型号，[platform] 是平台短名。
 @immutable
 class DeviceIdentity {
@@ -229,7 +229,7 @@ abstract final class DeviceIdentityService {
 
   /// 判断硬件标识是否可用。
   ///
-  /// 部分 Windows 主板未烧录 UUID，读出来是全 0 或全 F；这类「假 UUID」
+  /// 部分 Windows 主板未烧录 UUID，读出来是全 0 或全 F；这类“假 UUID”
   /// 必须判为采集失败，否则一大批设备会撞成同一条指纹记录。
   @visibleForTesting
   static bool isUsableHardwareId(String raw) => _isUsableHardwareId(raw);

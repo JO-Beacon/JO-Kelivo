@@ -604,7 +604,7 @@ void main() {
         _legacyId('default_assistant-1'),
       );
       expect(tree, isNotNull);
-      // 单列表 fork 表示「当前选中的版本就是这条替代内容」：
+      // 单列表 fork 表示“当前选中的版本就是这条替代内容”：
       // 归一化后幸存内容并入主线，活跃路径直接展示 fork-answer
       // （可达即可见，契约 §8）。
       expect(tree!.activePath(), [

@@ -82,7 +82,7 @@ class SectionCard extends StatelessWidget {
 
 /// 面板内操作瓦片的填充色。
 ///
-/// 与上游的差别：上游有「分层表单瓦片」开关（关闭时返回透明），本仓库尚无该
+/// 与上游的差别：上游有“分层表单瓦片”开关（关闭时返回透明），本仓库尚无该
 /// 字段，沿用仓库既有的 `surfaceFill` 口径（与 `bottom_tools_sheet.dart`、
 /// `context_management_sheet.dart` 一致）。
 Color sheetTileColor(BuildContext context) => context.appColors.surfaceFill;

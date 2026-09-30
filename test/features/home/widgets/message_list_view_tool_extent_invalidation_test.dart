@@ -408,7 +408,7 @@ class _HarnessState extends State<_Harness> {
             listController: listController,
             messages: messages,
             byGroup: const {},
-            // 本仓库把「是否有文件在处理」作为列表必填门控（上游无此参数）。
+            // 本仓库把“是否有文件在处理”作为列表必填门控（上游无此参数）。
             reasoning: const <String, stream_ctrl.ReasoningData>{},
             reasoningSegments:
                 const <String, List<stream_ctrl.ReasoningSegmentData>>{},

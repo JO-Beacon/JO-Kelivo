@@ -831,7 +831,7 @@ void main() {
       );
       final iconRect = tester.getRect(earth);
       // 合并上游渲染层后，连接线不再是带独立 key 的两条线，
-      // 改为量「图标列容器」与图标的上下间距（上游同一用例的做法）。
+      // 改为量“图标列容器”与图标的上下间距（上游同一用例的做法）。
       final columnRect = tester.getRect(
         find.ancestor(
           of: earth,

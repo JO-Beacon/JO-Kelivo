@@ -5,16 +5,16 @@ import 'package:flutter_test/flutter_test.dart';
 
 /// 消息级分叉模型的产品方向：重新生成永远新建分支，不删除后续消息。
 ///
-/// 上游保留着「重新生成时删除下面的消息」这个设置，基线升级会把它整体带回来。
+/// 上游保留着“重新生成时删除下面的消息”这个设置，基线升级会把它整体带回来。
 /// 本门禁按 AGENTS 第 9 节把它钉死：相关标识符与文案不得再次出现，
 /// 且重新生成的行为必须保持 `truncateFuture = false`。
 void main() {
-  test('已作废的「重新生成时删除下面的消息」不得再次出现', () async {
+  test('已作废的“重新生成时删除下面的消息”不得再次出现', () async {
     const forbidden = <String>[
       // 设置键、字段与访问器
       'display_regenerate_delete_trailing_messages_v1',
       'regenerateDeleteTrailingMessages',
-      // 设置项文案与「会删除下文」的确认文案
+      // 设置项文案与“会删除下文”的确认文案
       'displaySettingsPageRegenerateDeleteTrailingMessages',
       'chatMessageWidgetRegenerateConfirmDeleteTrailingContent',
     ];

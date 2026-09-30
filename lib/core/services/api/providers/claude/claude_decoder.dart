@@ -672,7 +672,7 @@ TokenUsage claudeUsageFromMap(Map<String, dynamic> usage) {
   final cacheRead = _readClaudeUsageInt(usage['cache_read_input_tokens']);
   final cacheWrite = _readClaudeUsageInt(usage['cache_creation_input_tokens']);
   final uncached = _readClaudeUsageInt(usage['input_tokens']);
-  // Claude 把缓存读写与未缓存输入分开报；进入「提示词总量」的应是三者之和。
+  // Claude 把缓存读写与未缓存输入分开报；进入“提示词总量”的应是三者之和。
   final inTok = uncached == null && cacheRead == null && cacheWrite == null
       ? null
       : (uncached ?? 0) + (cacheRead ?? 0) + (cacheWrite ?? 0);

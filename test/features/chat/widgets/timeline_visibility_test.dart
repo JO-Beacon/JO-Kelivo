@@ -5,7 +5,7 @@ import 'package:Kelivo/features/home/services/local_tools_service.dart';
 
 void main() {
   test('parses tool result images while preserving clean text', () {
-    // 同步上游后的语义：只有「整行独占」的图片行才作为附件抽出，
+    // 同步上游后的语义：只有“整行独占”的图片行才作为附件抽出，
     // 夹在正文里的图片保持原样（上游 90c9f4cc 起的实现）。
     final standalone = parseToolResultImages(
       'before\n![plot](/tmp/run (1)/plot.png)\nafter',
@@ -53,9 +53,9 @@ end''');
       ),
       isTrue,
     );
-    // 同步上游后的语义：关闭工具卡片时，只有「待审批」的加载中工具保持
-    // 可见（上游 90c9f4cc 起的实现）。本仓库 8-29 自建版曾是「加载中即
-    // 可见」，随同步上游改为待审批才可见。
+    // 同步上游后的语义：关闭工具卡片时，只有“待审批”的加载中工具保持
+    // 可见（上游 90c9f4cc 起的实现）。本仓库 8-29 自建版曾是“加载中即
+    // 可见”，随同步上游改为待审批才可见。
     expect(
       isTimelineToolVisible(
         toolName: 'search_web',

@@ -192,7 +192,7 @@ Future<void> main(List<String> arguments) async {
         } catch (_) {}
       }
       if (Platform.isAndroid) {
-        // 读一次安卓 API 级别，用于决定是否展示「自适应刷新率」开关。
+        // 读一次安卓 API 级别，用于决定是否展示“自适应刷新率”开关。
         unawaited(AndroidRefreshRateService.ensureSdkIntLoaded());
       }
       // 在恢复或数据库准入前渲染一个不依赖持久化数据的启动外壳。

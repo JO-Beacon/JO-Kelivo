@@ -242,7 +242,7 @@ final class Usage extends StreamChunk {
 
   final TokenUsage usage;
 
-  /// 本轮对话中「另一次 API 请求」的首次用量快照。
+  /// 本轮对话中“另一次 API 请求”的首次用量快照。
   /// 同一次请求内的后续快照是覆盖计数，不是增量。
   final bool startsRequest;
 }

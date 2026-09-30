@@ -143,8 +143,8 @@ void main() {
     });
   }
   // ---- 以下两个用例来自上游 P5（fe8cb760 新增的 file_upload_service_test）----
-  // 它们测的是「工作区模式下文件选择器的参数透传」，与本文件上半部分的
-  // 「选图片裁剪流程」互补，故两份并存。
+  // 它们测的是“工作区模式下文件选择器的参数透传”，与本文件上半部分的
+  // “选图片裁剪流程”互补，故两份并存。
 
   test(
     'picker follows workspace binding without enabling byte buffering',

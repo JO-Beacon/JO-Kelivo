@@ -2794,7 +2794,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     final showModelTimestamp = context.select<SettingsProvider, bool>(
       (s) => s.showModelTimestamp,
     );
-    // 关闭「整轮用量」时只显示最后一次请求的用量。
+    // 关闭“整轮用量”时只显示最后一次请求的用量。
     final showTotalTokens = context.select<SettingsProvider, bool>(
       (s) => s.showTotalTokens,
     );

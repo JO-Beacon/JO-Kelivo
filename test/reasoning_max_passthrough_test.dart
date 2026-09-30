@@ -4,7 +4,7 @@ import 'package:Kelivo/core/services/api/chat_api_helpers.dart';
 import 'package:Kelivo/core/services/api/providers/openai/openai_vendor_compat.dart';
 import 'package:Kelivo/core/utils/openai_model_compat.dart';
 
-/// max 档位改为「常显 + 原样发送」。
+/// max 档位改为“常显 + 原样发送”。
 ///
 /// 以前选了 max，若模型表里没有 max，会被静默降级成 xhigh/high，界面显示的和
 /// 实际发出的不一致。现在原样发出，供应商不接受就由供应商报错（HTTP 400 的
@@ -38,9 +38,9 @@ void main() {
   });
 
   test('Claude 自适应模型选了 max 就发 max', () {
-    // 注：Claude 侧那条「max 降级成 xhigh/high」的回退实际上不可达——
+    // 注：Claude 侧那条“max 降级成 xhigh/high”的回退实际上不可达——
     // 能走到档位分支的模型（自适应/常开）在本地表里都已经含 max。改掉它是
-    // 为了与「max 不降级」这条规则保持一致，不留下一个看着像能降级的陷阱。
+    // 为了与“max 不降级”这条规则保持一致，不留下一个看着像能降级的陷阱。
     expect(claudeOutputConfig('claude-opus-4-6', 128000), {'effort': 'max'});
     expect(claudeOutputConfig('claude-fable-5', 128000), {'effort': 'max'});
   });

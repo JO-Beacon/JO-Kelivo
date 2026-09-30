@@ -18,10 +18,10 @@ class WindowAppearanceSync {
   static int? _lastBorder;
   static bool? _lastDark;
 
-  /// 系统「Windows 模式」的明暗，读不到时为 null。
+  /// 系统“Windows 模式”的明暗，读不到时为 null。
   ///
-  /// Windows 的个性化设置里有两个独立的开关：应用跟随「应用模式」，而任务栏、
-  /// 通知区域和开始菜单跟随「Windows 模式」，后者可以和应用自身的明暗完全不同。
+  /// Windows 的个性化设置里有两个独立的开关：应用跟随“应用模式”，而任务栏、
+  /// 通知区域和开始菜单跟随“Windows 模式”，后者可以和应用自身的明暗完全不同。
   ///
   /// 托盘图形曾按这个值切换，现已改为跟随应用主题（见 desktop_tray_controller.dart
   /// 的 applyBrightness），目前没有调用方。保留是因为它是任务栏底色唯一的来源，
@@ -31,7 +31,7 @@ class WindowAppearanceSync {
 
   static bool _watchingSystemBrightness = false;
 
-  /// 开始跟踪系统「Windows 模式」：读一次初值，之后系统切换时更新
+  /// 开始跟踪系统“Windows 模式”：读一次初值，之后系统切换时更新
   /// [systemBrightness]。重复调用是安全的，监听只装一次。
   static Future<void> watchSystemBrightness() async {
     if (kIsWeb || defaultTargetPlatform != TargetPlatform.windows) {
@@ -56,7 +56,7 @@ class WindowAppearanceSync {
     }
   }
 
-  /// 主动读一次系统「Windows 模式」的明暗；读不到时返回 null。
+  /// 主动读一次系统“Windows 模式”的明暗；读不到时返回 null。
   static Future<Brightness?> refreshSystemBrightness() async {
     if (kIsWeb || defaultTargetPlatform != TargetPlatform.windows) {
       return null;

@@ -22,7 +22,7 @@ Future<T> runWithLoadingTaskDialog<T>({
   assert(task != null || cancellableTask != null);
   final overlay = Overlay.of(context, rootOverlay: true);
   final progress = ValueNotifier<ProgressUpdate?>(null);
-  // 有 flow 时把「阶段内进度」换算成整条流水线的总体进度，否则沿用原始比值。
+  // 有 flow 时把“阶段内进度”换算成整条流水线的总体进度，否则沿用原始比值。
   final timeline = flow == null ? null : BackupProgressTimeline(flow);
   final cancelToken = BackupCancelToken();
   late final OverlayEntry entry;

@@ -1084,8 +1084,8 @@ class _BrandAvatar extends StatelessWidget {
 
 /// 切换聊天里选模型时写入哪一层：会话，还是当前助手。
 ///
-/// 会话上的单独设置始终保留，关掉再打开依然生效，所以文案说的是「作用范围」，
-/// 而不是「重置」。
+/// 会话上的单独设置始终保留，关掉再打开依然生效，所以文案说的是“作用范围”，
+/// 而不是“重置”。
 class _PerChatModelCard extends StatelessWidget {
   const _PerChatModelCard({required this.value, required this.onChanged});
 

@@ -1484,7 +1484,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get assistantEditPromptTimeVarWarning =>
-      '在系统提示词中使用时间变量会让每一轮请求的开头都不同，Prompt 缓存无法命中，费用和首字延迟都会上升。需要让模型知道当前时间时，请改用下方的「追加当前时间」开关。';
+      '在系统提示词中使用时间变量会让每一轮请求的开头都不同，Prompt 缓存无法命中，费用和首字延迟都会上升。需要让模型知道当前时间时，请改用下方的“追加当前时间”开关。';
 
   @override
   String get assistantEditPromptIso8601Title => '使用 ISO 8601 格式';
@@ -1516,7 +1516,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String assistantEditPromptTimeVarDialogBody(String variables) {
-    return '你的系统提示词里用了 $variables。系统提示词每次请求都会重新渲染，含时间变量会让每一轮请求的开头都不同，Prompt 缓存无法命中。建议移除这些变量，改用「追加当前时间」——它把时间放在请求末尾，不影响前缀。';
+    return '你的系统提示词里用了 $variables。系统提示词每次请求都会重新渲染，含时间变量会让每一轮请求的开头都不同，Prompt 缓存无法命中。建议移除这些变量，改用“追加当前时间”——它把时间放在请求末尾，不影响前缀。';
   }
 
   @override
@@ -4096,7 +4096,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get providerGroupsDeleteConfirmTitle => '删除分组';
 
   @override
-  String get providerGroupsDeleteConfirmContent => '该组内供应商将移动到「其他」';
+  String get providerGroupsDeleteConfirmContent => '该组内供应商将移动到“其他”';
 
   @override
   String get providerGroupsDeleteConfirmCancel => '取消';
@@ -6666,7 +6666,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get memorySettingsModelUnset => '未选择';
 
   @override
-  String get memorySettingsModelTip => '开启「自动整理记忆」后，后台会频繁调用此模型，建议选择便宜且速度快的模型。';
+  String get memorySettingsModelTip => '开启“自动整理记忆”后，后台会频繁调用此模型，建议选择便宜且速度快的模型。';
 
   @override
   String get memorySettingsAboutTitle => '记忆说明';
@@ -6676,14 +6676,14 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get memorySettingsAboutBody =>
-      '记忆如何运作\n记忆按「身份 / 工作流 / 语气 / 指令」分类，并区分全局与助手范围。对话时，相关记忆会注入模型上下文；条目较多时先展示摘要，模型可用工具继续查询更多内容。\n\n后台如何处理、如何触发\n处理模型用于后台整理管线：判断是否值得记忆、提取候选、去重合并，必要时再提炼用户画像。助手开启「自动整理」后，会按设定轮数在对话结束后自动触发；也可在助手「记忆」页手动整理。因此该模型会被较频繁调用。\n\n如何保持缓存良好\n尽量让注入对话的记忆前缀保持稳定，避免无意义的大批量改动或频繁重排，有助于 Prompt 缓存命中，从而降低费用与延迟。日常增删改单条记忆通常影响有限。';
+      '记忆如何运作\n记忆按“身份 / 工作流 / 语气 / 指令”分类，并区分全局与助手范围。对话时，相关记忆会注入模型上下文；条目较多时先展示摘要，模型可用工具继续查询更多内容。\n\n后台如何处理、如何触发\n处理模型用于后台整理管线：判断是否值得记忆、提取候选、去重合并，必要时再提炼用户画像。助手开启“自动整理”后，会按设定轮数在对话结束后自动触发；也可在助手“记忆”页手动整理。因此该模型会被较频繁调用。\n\n如何保持缓存良好\n尽量让注入对话的记忆前缀保持稳定，避免无意义的大批量改动或频繁重排，有助于 Prompt 缓存命中，从而降低费用与延迟。日常增删改单条记忆通常影响有限。';
 
   @override
   String get memoryAboutQuickstartTitle => '三步上手';
 
   @override
   String get memoryAboutQuickstartBody =>
-      '① 在「设置 → 记忆」里选择处理模型。\n② 在助手的「记忆」页打开长期记忆和自动整理。\n③ 聊几轮，或点「整理记忆」，再到「全部记忆」查看结果。';
+      '① 在“设置 → 记忆”里选择处理模型。\n② 在助手的“记忆”页打开长期记忆和自动整理。\n③ 聊几轮，或点“整理记忆”，再到“全部记忆”查看结果。';
 
   @override
   String get memoryAboutTypesTitle => '记忆类型';
@@ -6704,14 +6704,14 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get memoryAboutInjectionBody =>
-      '开对话时，每类会把最近的若干条放进模型上下文。某类超过注入上限时，块会标上 mode=\"summary\"，并用 total / shown 标明总数与展示条数，其余由模型用 memory_search_profile 按需查询。可在「设置 → 记忆」调大上限，更全面但更费 token。';
+      '开对话时，每类会把最近的若干条放进模型上下文。某类超过注入上限时，块会标上 mode=\"summary\"，并用 total / shown 标明总数与展示条数，其余由模型用 memory_search_profile 按需查询。可在“设置 → 记忆”调大上限，更全面但更费 token。';
 
   @override
   String get memoryAboutPipelineTitle => '后台整理';
 
   @override
   String get memoryAboutPipelineBody =>
-      '开启自动整理后，对话结束会走：判断是否值得记 → 提取候选 → 去重合并 → 必要时把身份类记忆提炼进用户画像。也可以在助手「记忆」页点「整理记忆」。因此处理模型会被较频繁调用。';
+      '开启自动整理后，对话结束会走：判断是否值得记 → 提取候选 → 去重合并 → 必要时把身份类记忆提炼进用户画像。也可以在助手“记忆”页点“整理记忆”。因此处理模型会被较频繁调用。';
 
   @override
   String get memoryAboutCacheTitle => '保持缓存良好';
@@ -7716,7 +7716,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String worldBookDeleteMessage(String name) {
-    return '确定删除「$name」？此操作无法撤销。';
+    return '确定删除“$name”？此操作无法撤销。';
   }
 
   @override
@@ -9538,7 +9538,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get startupDatabaseUpdateRequiredDowngradeStep1 =>
-      '先安装并打开最新版 JO-AIClient，在「设置 → 数据备份」导出一份备份文件。';
+      '先安装并打开最新版 JO-AIClient，在“设置 → 数据备份”导出一份备份文件。';
 
   @override
   String startupDatabaseUpdateRequiredDowngradeStep2(String url) {
@@ -10818,7 +10818,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get workspaceFilesSelectDirectory => '选择此目录';
 
   @override
-  String get workspaceFilesEmptyHint => '用「新建」或「导入」添加文件';
+  String get workspaceFilesEmptyHint => '用“新建”或“导入”添加文件';
 
   @override
   String get workspaceFilesEmptyAttachments => '还没有附件';
@@ -11143,7 +11143,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get workspaceFilesEmptyPickerHint => '点「新建文件夹」添加子文件夹';
+  String get workspaceFilesEmptyPickerHint => '点“新建文件夹”添加子文件夹';
 
   @override
   String get skillsDetailBodyEmpty => '还没有技能正文';
@@ -11173,7 +11173,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String workspaceBindingSetAssistantDefault(String assistant) {
-    return '已设为「$assistant」的默认工作区';
+    return '已设为“$assistant”的默认工作区';
   }
 
   @override
@@ -11430,7 +11430,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String attachmentRequiresWorkspace(String name) {
-    return '「$name」无法在普通对话中直接读取。请绑定工作区并启用文件工具，或将草稿移到已有工作区的对话。';
+    return '“$name”无法在普通对话中直接读取。请绑定工作区并启用文件工具，或将草稿移到已有工作区的对话。';
   }
 
   @override
@@ -12288,12 +12288,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String workspaceBindingRememberedDefault(String assistant) {
-    return '已记为「$assistant」的默认工作区，新对话将自动使用。';
+    return '已记为“$assistant”的默认工作区，新对话将自动使用。';
   }
 
   @override
   String workspaceBindingSuggestDefault(String assistant) {
-    return '以后与「$assistant」的新对话也使用这个工作区？';
+    return '以后与“$assistant”的新对话也使用这个工作区？';
   }
 
   @override
@@ -12314,7 +12314,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get scheduledTasksIOSDetail =>
-      '受 iOS 后台限制，Kelivo 不能在指定时间自动唤醒并运行模型。此功能会在 App 可运行时提前准备内容，由系统到点展示通知。每次仅准备下一次结果；离开 App 后不保证准备完成，后续任务需再次打开 Kelivo 才能补充。';
+      '受 iOS 后台限制，JO-AIClient 不能在指定时间自动唤醒并运行模型。此功能会在 App 可运行时提前准备内容，由系统到点展示通知。每次仅准备下一次结果；离开 App 后不保证准备完成，后续任务需再次打开 JO-AIClient 才能补充。';
 
   @override
   String get scheduledTasksContextPolicy => '对话上下文';
@@ -12378,7 +12378,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get scheduledTasksCancelled => '已取消';
 
   @override
-  String get scheduledTasksReminderBody => '定时任务已到期，打开 Kelivo 继续。';
+  String get scheduledTasksReminderBody => '定时任务已到期，打开 JO-AIClient 继续。';
 
   @override
   String get scheduledTasksResultBody => '定时任务结果已准备好。';
@@ -12388,11 +12388,11 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get scheduledTasksPreparationCost =>
-      '提前准备会调用模型，可能产生额外费用。选择「跟随最新对话」时，新消息可能使已准备内容失效。即使结果未使用或请求被取消，仍可能计费；重新准备会再次调用模型。';
+      '提前准备会调用模型，可能产生额外费用。选择“跟随最新对话”时，新消息可能使已准备内容失效。即使结果未使用或请求被取消，仍可能计费；重新准备会再次调用模型。';
 
   @override
   String get scheduledTasksAllowPreparationTip =>
-      '在 Kelivo 可运行时，提前生成下一次任务的结果，到期前不会显示在聊天中。仅使用文字，不使用工具、附件或自定义请求体；调用模型可能产生费用。';
+      '在 JO-AIClient 可运行时，提前生成下一次任务的结果，到期前不会显示在聊天中。仅使用文字，不使用工具、附件或自定义请求体；调用模型可能产生费用。';
 
   @override
   String get scheduledTasksContextPolicyTip =>
@@ -12400,7 +12400,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get scheduledTasksPreparationWindowTip =>
-      '允许在任务到期前多久开始准备，最长 24 小时。例如第二天早上提醒，前一天中午打开 Kelivo 时就有机会准备。时间越长，准备机会越多，但内容也可能更早过时。不会改变任务时间，也不代表能在后台定时运行。';
+      '允许在任务到期前多久开始准备，最长 24 小时。例如第二天早上提醒，前一天中午打开 JO-AIClient 时就有机会准备。时间越长，准备机会越多，但内容也可能更早过时。不会改变任务时间，也不代表能在后台定时运行。';
 
   @override
   String get scheduledTasksPreparationAttemptsTip =>
@@ -12412,7 +12412,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get scheduledTasksUnavailableTip =>
-      '到期时没有可用结果、也无法运行任务，就发送提醒或跳过本次。提醒不包含模型生成的回答，且需要开启通知。如果到期时 Kelivo 正在打开运行，可直接执行任务。';
+      '到期时没有可用结果、也无法运行任务，就发送提醒或跳过本次。提醒不包含模型生成的回答，且需要开启通知。如果到期时 JO-AIClient 正在打开运行，可直接执行任务。';
 
   @override
   String get scheduledTasksNotifyTip =>
@@ -12469,7 +12469,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String scheduledTasksPreparationAttemptsUsed(int count, int limit) {
-    return '本次已尝试 $count 次，自动准备上限为 $limit 次。可使用「立刻准备」继续。';
+    return '本次已尝试 $count 次，自动准备上限为 $limit 次。可使用“立刻准备”继续。';
   }
 
   @override
@@ -12477,7 +12477,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get scheduledTasksPreparationHourlyLimitDetail =>
-      '已达到每小时准备次数上限，自动准备将在额度恢复后继续；仍可使用「立刻准备」。';
+      '已达到每小时准备次数上限，自动准备将在额度恢复后继续；仍可使用“立刻准备”。';
 
   @override
   String get scheduledTasksPreparationUnavailable => '暂时无法准备';
@@ -12539,7 +12539,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get scheduledTasksPrepareNowDisabled =>
-      '请先启用任务和「允许提前准备」。重新生成模式不支持提前准备。';
+      '请先启用任务和“允许提前准备”。重新生成模式不支持提前准备。';
 
   @override
   String get scheduledTasksPrepareNowUnavailable => '暂时无法开始准备，请稍后再试。';
@@ -14659,7 +14659,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get assistantEditPromptTimeVarWarning =>
-      '在系统提示词中使用时间变量会让每一轮请求的开头都不同，Prompt 缓存无法命中，费用和首字延迟都会上升。需要让模型知道当前时间时，请改用下方的「追加当前时间」开关。';
+      '在系统提示词中使用时间变量会让每一轮请求的开头都不同，Prompt 缓存无法命中，费用和首字延迟都会上升。需要让模型知道当前时间时，请改用下方的“追加当前时间”开关。';
 
   @override
   String get assistantEditPromptIso8601Title => '使用 ISO 8601 格式';
@@ -14691,7 +14691,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String assistantEditPromptTimeVarDialogBody(String variables) {
-    return '你的系统提示词里用了 $variables。系统提示词每次请求都会重新渲染，含时间变量会让每一轮请求的开头都不同，Prompt 缓存无法命中。建议移除这些变量，改用「追加当前时间」——它把时间放在请求末尾，不影响前缀。';
+    return '你的系统提示词里用了 $variables。系统提示词每次请求都会重新渲染，含时间变量会让每一轮请求的开头都不同，Prompt 缓存无法命中。建议移除这些变量，改用“追加当前时间”——它把时间放在请求末尾，不影响前缀。';
   }
 
   @override
@@ -17271,7 +17271,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get providerGroupsDeleteConfirmTitle => '删除分组';
 
   @override
-  String get providerGroupsDeleteConfirmContent => '该组内供应商将移动到「其他」';
+  String get providerGroupsDeleteConfirmContent => '该组内供应商将移动到“其他”';
 
   @override
   String get providerGroupsDeleteConfirmCancel => '取消';
@@ -19841,7 +19841,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get memorySettingsModelUnset => '未选择';
 
   @override
-  String get memorySettingsModelTip => '开启「自动整理记忆」后，后台会频繁调用此模型，建议选择便宜且速度快的模型。';
+  String get memorySettingsModelTip => '开启“自动整理记忆”后，后台会频繁调用此模型，建议选择便宜且速度快的模型。';
 
   @override
   String get memorySettingsAboutTitle => '记忆说明';
@@ -19851,14 +19851,14 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get memorySettingsAboutBody =>
-      '记忆如何运作\n记忆按「身份 / 工作流 / 语气 / 指令」分类，并区分全局与助手范围。对话时，相关记忆会注入模型上下文；条目较多时先展示摘要，模型可用工具继续查询更多内容。\n\n后台如何处理、如何触发\n处理模型用于后台整理管线：判断是否值得记忆、提取候选、去重合并，必要时再提炼用户画像。助手开启「自动整理」后，会按设定轮数在对话结束后自动触发；也可在助手「记忆」页手动整理。因此该模型会被较频繁调用。\n\n如何保持缓存良好\n尽量让注入对话的记忆前缀保持稳定，避免无意义的大批量改动或频繁重排，有助于 Prompt 缓存命中，从而降低费用与延迟。日常增删改单条记忆通常影响有限。';
+      '记忆如何运作\n记忆按“身份 / 工作流 / 语气 / 指令”分类，并区分全局与助手范围。对话时，相关记忆会注入模型上下文；条目较多时先展示摘要，模型可用工具继续查询更多内容。\n\n后台如何处理、如何触发\n处理模型用于后台整理管线：判断是否值得记忆、提取候选、去重合并，必要时再提炼用户画像。助手开启“自动整理”后，会按设定轮数在对话结束后自动触发；也可在助手“记忆”页手动整理。因此该模型会被较频繁调用。\n\n如何保持缓存良好\n尽量让注入对话的记忆前缀保持稳定，避免无意义的大批量改动或频繁重排，有助于 Prompt 缓存命中，从而降低费用与延迟。日常增删改单条记忆通常影响有限。';
 
   @override
   String get memoryAboutQuickstartTitle => '三步上手';
 
   @override
   String get memoryAboutQuickstartBody =>
-      '① 在「设置 → 记忆」里选择处理模型。\n② 在助手的「记忆」页打开长期记忆和自动整理。\n③ 聊几轮，或点「整理记忆」，再到「全部记忆」查看结果。';
+      '① 在“设置 → 记忆”里选择处理模型。\n② 在助手的“记忆”页打开长期记忆和自动整理。\n③ 聊几轮，或点“整理记忆”，再到“全部记忆”查看结果。';
 
   @override
   String get memoryAboutTypesTitle => '记忆类型';
@@ -19879,14 +19879,14 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get memoryAboutInjectionBody =>
-      '开对话时，每类会把最近的若干条放进模型上下文。某类超过注入上限时，块会标上 mode=\"summary\"，并用 total / shown 标明总数与展示条数，其余由模型用 memory_search_profile 按需查询。可在「设置 → 记忆」调大上限，更全面但更费 token。';
+      '开对话时，每类会把最近的若干条放进模型上下文。某类超过注入上限时，块会标上 mode=\"summary\"，并用 total / shown 标明总数与展示条数，其余由模型用 memory_search_profile 按需查询。可在“设置 → 记忆”调大上限，更全面但更费 token。';
 
   @override
   String get memoryAboutPipelineTitle => '后台整理';
 
   @override
   String get memoryAboutPipelineBody =>
-      '开启自动整理后，对话结束会走：判断是否值得记 → 提取候选 → 去重合并 → 必要时把身份类记忆提炼进用户画像。也可以在助手「记忆」页点「整理记忆」。因此处理模型会被较频繁调用。';
+      '开启自动整理后，对话结束会走：判断是否值得记 → 提取候选 → 去重合并 → 必要时把身份类记忆提炼进用户画像。也可以在助手“记忆”页点“整理记忆”。因此处理模型会被较频繁调用。';
 
   @override
   String get memoryAboutCacheTitle => '保持缓存良好';
@@ -20891,7 +20891,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String worldBookDeleteMessage(String name) {
-    return '确定删除「$name」？此操作无法撤销。';
+    return '确定删除“$name”？此操作无法撤销。';
   }
 
   @override
@@ -22713,7 +22713,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get startupDatabaseUpdateRequiredDowngradeStep1 =>
-      '先安装并打开最新版 JO-AIClient，在「设置 → 数据备份」导出一份备份文件。';
+      '先安装并打开最新版 JO-AIClient，在“设置 → 数据备份”导出一份备份文件。';
 
   @override
   String startupDatabaseUpdateRequiredDowngradeStep2(String url) {
@@ -23993,7 +23993,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get workspaceFilesSelectDirectory => '选择此目录';
 
   @override
-  String get workspaceFilesEmptyHint => '用「新建」或「导入」添加文件';
+  String get workspaceFilesEmptyHint => '用“新建”或“导入”添加文件';
 
   @override
   String get workspaceFilesEmptyAttachments => '还没有附件';
@@ -24318,7 +24318,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   }
 
   @override
-  String get workspaceFilesEmptyPickerHint => '点「新建文件夹」添加子文件夹';
+  String get workspaceFilesEmptyPickerHint => '点“新建文件夹”添加子文件夹';
 
   @override
   String get skillsDetailBodyEmpty => '还没有技能正文';
@@ -24348,7 +24348,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String workspaceBindingSetAssistantDefault(String assistant) {
-    return '已设为「$assistant」的默认工作区';
+    return '已设为“$assistant”的默认工作区';
   }
 
   @override
@@ -24605,7 +24605,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String attachmentRequiresWorkspace(String name) {
-    return '「$name」无法在普通对话中直接读取。请绑定工作区并启用文件工具，或将草稿移到已有工作区的对话。';
+    return '“$name”无法在普通对话中直接读取。请绑定工作区并启用文件工具，或将草稿移到已有工作区的对话。';
   }
 
   @override
@@ -25463,12 +25463,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String workspaceBindingRememberedDefault(String assistant) {
-    return '已记为「$assistant」的默认工作区，新对话将自动使用。';
+    return '已记为“$assistant”的默认工作区，新对话将自动使用。';
   }
 
   @override
   String workspaceBindingSuggestDefault(String assistant) {
-    return '以后与「$assistant」的新对话也使用这个工作区？';
+    return '以后与“$assistant”的新对话也使用这个工作区？';
   }
 
   @override
@@ -25489,7 +25489,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get scheduledTasksIOSDetail =>
-      '受 iOS 后台限制，Kelivo 不能在指定时间自动唤醒并运行模型。此功能会在 App 可运行时提前准备内容，由系统到点展示通知。每次仅准备下一次结果；离开 App 后不保证准备完成，后续任务需再次打开 Kelivo 才能补充。';
+      '受 iOS 后台限制，JO-AIClient 不能在指定时间自动唤醒并运行模型。此功能会在 App 可运行时提前准备内容，由系统到点展示通知。每次仅准备下一次结果；离开 App 后不保证准备完成，后续任务需再次打开 JO-AIClient 才能补充。';
 
   @override
   String get scheduledTasksContextPolicy => '对话上下文';
@@ -25553,7 +25553,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get scheduledTasksCancelled => '已取消';
 
   @override
-  String get scheduledTasksReminderBody => '定时任务已到期，打开 Kelivo 继续。';
+  String get scheduledTasksReminderBody => '定时任务已到期，打开 JO-AIClient 继续。';
 
   @override
   String get scheduledTasksResultBody => '定时任务结果已准备好。';
@@ -25563,11 +25563,11 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get scheduledTasksPreparationCost =>
-      '提前准备会调用模型，可能产生额外费用。选择「跟随最新对话」时，新消息可能使已准备内容失效。即使结果未使用或请求被取消，仍可能计费；重新准备会再次调用模型。';
+      '提前准备会调用模型，可能产生额外费用。选择“跟随最新对话”时，新消息可能使已准备内容失效。即使结果未使用或请求被取消，仍可能计费；重新准备会再次调用模型。';
 
   @override
   String get scheduledTasksAllowPreparationTip =>
-      '在 Kelivo 可运行时，提前生成下一次任务的结果，到期前不会显示在聊天中。仅使用文字，不使用工具、附件或自定义请求体；调用模型可能产生费用。';
+      '在 JO-AIClient 可运行时，提前生成下一次任务的结果，到期前不会显示在聊天中。仅使用文字，不使用工具、附件或自定义请求体；调用模型可能产生费用。';
 
   @override
   String get scheduledTasksContextPolicyTip =>
@@ -25575,7 +25575,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get scheduledTasksPreparationWindowTip =>
-      '允许在任务到期前多久开始准备，最长 24 小时。例如第二天早上提醒，前一天中午打开 Kelivo 时就有机会准备。时间越长，准备机会越多，但内容也可能更早过时。不会改变任务时间，也不代表能在后台定时运行。';
+      '允许在任务到期前多久开始准备，最长 24 小时。例如第二天早上提醒，前一天中午打开 JO-AIClient 时就有机会准备。时间越长，准备机会越多，但内容也可能更早过时。不会改变任务时间，也不代表能在后台定时运行。';
 
   @override
   String get scheduledTasksPreparationAttemptsTip =>
@@ -25587,7 +25587,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get scheduledTasksUnavailableTip =>
-      '到期时没有可用结果、也无法运行任务，就发送提醒或跳过本次。提醒不包含模型生成的回答，且需要开启通知。如果到期时 Kelivo 正在打开运行，可直接执行任务。';
+      '到期时没有可用结果、也无法运行任务，就发送提醒或跳过本次。提醒不包含模型生成的回答，且需要开启通知。如果到期时 JO-AIClient 正在打开运行，可直接执行任务。';
 
   @override
   String get scheduledTasksNotifyTip =>
@@ -25644,7 +25644,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String scheduledTasksPreparationAttemptsUsed(int count, int limit) {
-    return '本次已尝试 $count 次，自动准备上限为 $limit 次。可使用「立刻准备」继续。';
+    return '本次已尝试 $count 次，自动准备上限为 $limit 次。可使用“立刻准备”继续。';
   }
 
   @override
@@ -25652,7 +25652,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get scheduledTasksPreparationHourlyLimitDetail =>
-      '已达到每小时准备次数上限，自动准备将在额度恢复后继续；仍可使用「立刻准备」。';
+      '已达到每小时准备次数上限，自动准备将在额度恢复后继续；仍可使用“立刻准备”。';
 
   @override
   String get scheduledTasksPreparationUnavailable => '暂时无法准备';
@@ -25714,7 +25714,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get scheduledTasksPrepareNowDisabled =>
-      '请先启用任务和「允许提前准备」。重新生成模式不支持提前准备。';
+      '请先启用任务和“允许提前准备”。重新生成模式不支持提前准备。';
 
   @override
   String get scheduledTasksPrepareNowUnavailable => '暂时无法开始准备，请稍后再试。';
@@ -26383,7 +26383,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String chatImageCropFailed(String fileName, String error) {
-    return '圖片「$fileName」裁剪失敗：$error';
+    return '圖片“$fileName”裁剪失敗：$error';
   }
 
   @override
@@ -27834,7 +27834,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get assistantEditPromptTimeVarWarning =>
-      '在系統提示詞中使用時間變數會讓每一輪請求的開頭都不同，Prompt 快取無法命中，費用和首字延遲都會上升。需要讓模型知道當前時間時，請改用下方的「追加當前時間」開關。';
+      '在系統提示詞中使用時間變數會讓每一輪請求的開頭都不同，Prompt 快取無法命中，費用和首字延遲都會上升。需要讓模型知道當前時間時，請改用下方的“追加當前時間”開關。';
 
   @override
   String get assistantEditPromptIso8601Title => '使用 ISO 8601 格式';
@@ -27866,7 +27866,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String assistantEditPromptTimeVarDialogBody(String variables) {
-    return '你的系統提示詞裡用了 $variables。系統提示詞每次請求都會重新渲染，含時間變數會讓每一輪請求的開頭都不同，Prompt 快取無法命中。建議移除這些變數，改用「追加當前時間」——它把時間放在請求末尾，不影響前綴。';
+    return '你的系統提示詞裡用了 $variables。系統提示詞每次請求都會重新渲染，含時間變數會讓每一輪請求的開頭都不同，Prompt 快取無法命中。建議移除這些變數，改用“追加當前時間”——它把時間放在請求末尾，不影響前綴。';
   }
 
   @override
@@ -28417,7 +28417,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String backupPageDeleteConfirmContent(Object name) {
-    return '確定要刪除遠端備份「$name」嗎？此操作不可撤銷。';
+    return '確定要刪除遠端備份“$name”嗎？此操作不可撤銷。';
   }
 
   @override
@@ -29342,7 +29342,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String sideDrawerDeleteSnackbar(String title) {
-    return '已刪除「$title」';
+    return '已刪除“$title”';
   }
 
   @override
@@ -30446,7 +30446,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get providerGroupsDeleteConfirmTitle => '刪除分組';
 
   @override
-  String get providerGroupsDeleteConfirmContent => '該組內供應商將移動到「其他」';
+  String get providerGroupsDeleteConfirmContent => '該組內供應商將移動到“其他”';
 
   @override
   String get providerGroupsDeleteConfirmCancel => '取消';
@@ -33018,7 +33018,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get memorySettingsModelUnset => '未選擇';
 
   @override
-  String get memorySettingsModelTip => '開啟「自動整理記憶」後，後台會頻繁呼叫此模型，建議選擇便宜且速度快的模型。';
+  String get memorySettingsModelTip => '開啟“自動整理記憶”後，後台會頻繁呼叫此模型，建議選擇便宜且速度快的模型。';
 
   @override
   String get memorySettingsAboutTitle => '記憶說明';
@@ -33028,14 +33028,14 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get memorySettingsAboutBody =>
-      '記憶如何運作\n記憶按「身分 / 工作流 / 語氣 / 指令」分類，並區分全域與助手範圍。對話時，相關記憶會注入模型上下文；條目較多時先展示摘要，模型可用工具繼續查詢更多內容。\n\n後台如何處理、如何觸發\n處理模型用於後台整理管線：判斷是否值得記憶、提取候選、去重合併，必要時再提煉使用者畫像。助手開啟「自動整理」後，會按設定輪數在對話結束後自動觸發；也可在助手「記憶」頁手動整理。因此該模型會被較頻繁呼叫。\n\n如何保持快取良好\n盡量讓注入對話的記憶前綴保持穩定，避免無意義的大批量改動或頻繁重排，有助於 Prompt 快取命中，從而降低費用與延遲。日常增刪改單條記憶通常影響有限。';
+      '記憶如何運作\n記憶按“身分 / 工作流 / 語氣 / 指令”分類，並區分全域與助手範圍。對話時，相關記憶會注入模型上下文；條目較多時先展示摘要，模型可用工具繼續查詢更多內容。\n\n後台如何處理、如何觸發\n處理模型用於後台整理管線：判斷是否值得記憶、提取候選、去重合併，必要時再提煉使用者畫像。助手開啟“自動整理”後，會按設定輪數在對話結束後自動觸發；也可在助手“記憶”頁手動整理。因此該模型會被較頻繁呼叫。\n\n如何保持快取良好\n盡量讓注入對話的記憶前綴保持穩定，避免無意義的大批量改動或頻繁重排，有助於 Prompt 快取命中，從而降低費用與延遲。日常增刪改單條記憶通常影響有限。';
 
   @override
   String get memoryAboutQuickstartTitle => '三步上手';
 
   @override
   String get memoryAboutQuickstartBody =>
-      '① 在「設定 → 記憶」裡選擇處理模型。\n② 在助手的「記憶」頁打開長期記憶和自動整理。\n③ 聊幾輪，或點「整理記憶」，再到「全部記憶」查看結果。';
+      '① 在“設定 → 記憶”裡選擇處理模型。\n② 在助手的“記憶”頁打開長期記憶和自動整理。\n③ 聊幾輪，或點“整理記憶”，再到“全部記憶”查看結果。';
 
   @override
   String get memoryAboutTypesTitle => '記憶類型';
@@ -33056,14 +33056,14 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get memoryAboutInjectionBody =>
-      '開對話時，每類會把最近的若干條放進模型上下文。某類超過注入上限時，塊會標上 mode=\"summary\"，並用 total / shown 標明總數與展示條數，其餘由模型用 memory_search_profile 按需查詢。可在「設定 → 記憶」調大上限，更全面但更費 token。';
+      '開對話時，每類會把最近的若干條放進模型上下文。某類超過注入上限時，塊會標上 mode=\"summary\"，並用 total / shown 標明總數與展示條數，其餘由模型用 memory_search_profile 按需查詢。可在“設定 → 記憶”調大上限，更全面但更費 token。';
 
   @override
   String get memoryAboutPipelineTitle => '後台整理';
 
   @override
   String get memoryAboutPipelineBody =>
-      '開啟自動整理後，對話結束會走：判斷是否值得記 → 擷取候選 → 去重合併 → 必要時把身分類記憶提煉進使用者畫像。也可以在助手「記憶」頁點「整理記憶」。因此處理模型會被較頻繁呼叫。';
+      '開啟自動整理後，對話結束會走：判斷是否值得記 → 擷取候選 → 去重合併 → 必要時把身分類記憶提煉進使用者畫像。也可以在助手“記憶”頁點“整理記憶”。因此處理模型會被較頻繁呼叫。';
 
   @override
   String get memoryAboutCacheTitle => '保持快取良好';
@@ -34068,7 +34068,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String worldBookDeleteMessage(String name) {
-    return '確定刪除「$name」？此操作無法復原。';
+    return '確定刪除“$name”？此操作無法復原。';
   }
 
   @override
@@ -35345,7 +35345,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get backupLedgerEmpty => '還沒有任何裝置記錄';
 
   @override
-  String get backupLedgerEmptyDescription => '匯出時選擇「帶」，本機設定就會隨備份記錄在這裡。';
+  String get backupLedgerEmptyDescription => '匯出時選擇“帶”，本機設定就會隨備份記錄在這裡。';
 
   @override
   String get backupLedgerThisDevice => '（本機）';
@@ -35890,7 +35890,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get startupDatabaseUpdateRequiredDowngradeStep1 =>
-      '先安裝並開啟最新版 JO-AIClient，在「設定 → 資料備份」匯出一份備份檔。';
+      '先安裝並開啟最新版 JO-AIClient，在“設定 → 資料備份”匯出一份備份檔。';
 
   @override
   String startupDatabaseUpdateRequiredDowngradeStep2(String url) {
@@ -37171,7 +37171,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get workspaceFilesSelectDirectory => '選擇此目錄';
 
   @override
-  String get workspaceFilesEmptyHint => '用「新增」或「匯入」加入檔案';
+  String get workspaceFilesEmptyHint => '用“新增”或“匯入”加入檔案';
 
   @override
   String get workspaceFilesEmptyAttachments => '還沒有附件';
@@ -37496,7 +37496,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   }
 
   @override
-  String get workspaceFilesEmptyPickerHint => '點「新增資料夾」新增子資料夾';
+  String get workspaceFilesEmptyPickerHint => '點“新增資料夾”新增子資料夾';
 
   @override
   String get skillsDetailBodyEmpty => '還沒有技能正文';
@@ -37526,7 +37526,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String workspaceBindingSetAssistantDefault(String assistant) {
-    return '已設為「$assistant」的預設工作區';
+    return '已設為“$assistant”的預設工作區';
   }
 
   @override
@@ -37784,7 +37784,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String attachmentRequiresWorkspace(String name) {
-    return '「$name」無法在一般對話中直接讀取。請綁定工作區並啟用檔案工具，或將草稿移到已有工作區的對話。';
+    return '“$name”無法在一般對話中直接讀取。請綁定工作區並啟用檔案工具，或將草稿移到已有工作區的對話。';
   }
 
   @override
@@ -37802,7 +37802,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get workspaceExternalStorageMessage =>
-      '工作區和 Shell 需要直接讀寫外部資料夾，請在 Android 系統設定中允許 JO-AIClient 存取檔案。Android 11 及以上需開啟「所有檔案存取權限」，然後選擇要掛載的本機資料夾。';
+      '工作區和 Shell 需要直接讀寫外部資料夾，請在 Android 系統設定中允許 JO-AIClient 存取檔案。Android 11 及以上需開啟“所有檔案存取權限”，然後選擇要掛載的本機資料夾。';
 
   @override
   String get workspaceExternalGrantAccess => '前往授權';
@@ -38148,7 +38148,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get backgroundLocationAlways => '允許持續背景定位';
 
   @override
-  String get backgroundLocationAlwaysDetail => '可進一步授予「永遠允許」定位權限，僅在點擊此入口時申請。';
+  String get backgroundLocationAlwaysDetail => '可進一步授予“永遠允許”定位權限，僅在點擊此入口時申請。';
 
   @override
   String get backgroundSystemSettings => '應用程式系統設定';
@@ -38644,12 +38644,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String workspaceBindingRememberedDefault(String assistant) {
-    return '已記為「$assistant」的預設工作區，新對話將自動使用。';
+    return '已記為“$assistant”的預設工作區，新對話將自動使用。';
   }
 
   @override
   String workspaceBindingSuggestDefault(String assistant) {
-    return '以後與「$assistant」的新對話也使用這個工作區？';
+    return '以後與“$assistant”的新對話也使用這個工作區？';
   }
 
   @override
@@ -38670,7 +38670,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get scheduledTasksIOSDetail =>
-      '受 iOS 背景限制，Kelivo 不能在指定時間自動喚醒並執行模型。此功能會在 App 可執行時提前準備內容，由系統到點顯示通知。每次僅準備下一次結果；離開 App 後不保證準備完成，後續任務需再次開啟 Kelivo 才能補充。';
+      '受 iOS 背景限制，JO-AIClient 不能在指定時間自動喚醒並執行模型。此功能會在 App 可執行時提前準備內容，由系統到點顯示通知。每次僅準備下一次結果；離開 App 後不保證準備完成，後續任務需再次開啟 JO-AIClient 才能補充。';
 
   @override
   String get scheduledTasksContextPolicy => '對話上下文';
@@ -38734,7 +38734,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get scheduledTasksCancelled => '已取消';
 
   @override
-  String get scheduledTasksReminderBody => '定時任務已到期，開啟 Kelivo 繼續。';
+  String get scheduledTasksReminderBody => '定時任務已到期，開啟 JO-AIClient 繼續。';
 
   @override
   String get scheduledTasksResultBody => '定時任務結果已準備好。';
@@ -38744,11 +38744,11 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get scheduledTasksPreparationCost =>
-      '提前準備會呼叫模型，可能產生額外費用。選擇「跟隨最新對話」時，新訊息可能使已準備內容失效。即使結果未使用或請求被取消，仍可能計費；重新準備會再次呼叫模型。';
+      '提前準備會呼叫模型，可能產生額外費用。選擇“跟隨最新對話”時，新訊息可能使已準備內容失效。即使結果未使用或請求被取消，仍可能計費；重新準備會再次呼叫模型。';
 
   @override
   String get scheduledTasksAllowPreparationTip =>
-      '在 Kelivo 可執行時，提前產生下一次任務的結果，到期前不會顯示在聊天中。僅使用文字，不使用工具、附件或自訂請求內容；呼叫模型可能產生費用。';
+      '在 JO-AIClient 可執行時，提前產生下一次任務的結果，到期前不會顯示在聊天中。僅使用文字，不使用工具、附件或自訂請求內容；呼叫模型可能產生費用。';
 
   @override
   String get scheduledTasksContextPolicyTip =>
@@ -38756,7 +38756,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get scheduledTasksPreparationWindowTip =>
-      '允許在任務到期前多久開始準備，最長 24 小時。例如第二天早上提醒，前一天中午開啟 Kelivo 時就有機會準備。時間越長，準備機會越多，但內容也可能更早過時。不會改變任務時間，也不代表能在背景定時執行。';
+      '允許在任務到期前多久開始準備，最長 24 小時。例如第二天早上提醒，前一天中午開啟 JO-AIClient 時就有機會準備。時間越長，準備機會越多，但內容也可能更早過時。不會改變任務時間，也不代表能在背景定時執行。';
 
   @override
   String get scheduledTasksPreparationAttemptsTip =>
@@ -38768,7 +38768,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get scheduledTasksUnavailableTip =>
-      '到期時沒有可用結果、也無法執行任務，就傳送提醒或略過本次。提醒不包含模型產生的回答，且需要開啟通知。如果到期時 Kelivo 正在開啟執行，可直接執行任務。';
+      '到期時沒有可用結果、也無法執行任務，就傳送提醒或略過本次。提醒不包含模型產生的回答，且需要開啟通知。如果到期時 JO-AIClient 正在開啟執行，可直接執行任務。';
 
   @override
   String get scheduledTasksNotifyTip =>
@@ -38825,7 +38825,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String scheduledTasksPreparationAttemptsUsed(int count, int limit) {
-    return '本次已嘗試 $count 次，自動準備上限為 $limit 次。可使用「立刻準備」繼續。';
+    return '本次已嘗試 $count 次，自動準備上限為 $limit 次。可使用“立刻準備”繼續。';
   }
 
   @override
@@ -38833,7 +38833,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get scheduledTasksPreparationHourlyLimitDetail =>
-      '已達到每小時準備次數上限，自動準備將在額度恢復後繼續；仍可使用「立刻準備」。';
+      '已達到每小時準備次數上限，自動準備將在額度恢復後繼續；仍可使用“立刻準備”。';
 
   @override
   String get scheduledTasksPreparationUnavailable => '暫時無法準備';
@@ -38895,7 +38895,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get scheduledTasksPrepareNowDisabled =>
-      '請先啟用任務和「允許提前準備」。重新生成模式不支援提前準備。';
+      '請先啟用任務和“允許提前準備”。重新生成模式不支援提前準備。';
 
   @override
   String get scheduledTasksPrepareNowUnavailable => '暫時無法開始準備，請稍後再試。';
@@ -38950,14 +38950,14 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get phoneControlAssistantHint =>
-      '需要同時完成兩項設定：在系統無障礙設定中啟用「JO-AIClient 手機控制」，並在要使用的助手 → 本地工具中開啟「手機控制」（也可從對話工具選單開啟）。每個助手單獨設定，執行任務時請保持手機解鎖。';
+      '需要同時完成兩項設定：在系統無障礙設定中啟用“JO-AIClient 手機控制”，並在要使用的助手 → 本地工具中開啟“手機控制”（也可從對話工具選單開啟）。每個助手單獨設定，執行任務時請保持手機解鎖。';
 
   @override
   String get phoneControlRestrictedTitle => '無法開啟無障礙？';
 
   @override
   String get phoneControlRestrictedHint =>
-      '部分下載的 APK 需要先在應用程式資訊右上角選單中選擇「允許受限制的設定」。點擊開啟 JO-AIClient 應用程式資訊，完成後再返回無障礙設定。';
+      '部分下載的 APK 需要先在應用程式資訊右上角選單中選擇“允許受限制的設定”。點擊開啟 JO-AIClient 應用程式資訊，完成後再返回無障礙設定。';
 
   @override
   String get phoneControlEnableAssistant => '允許此助手使用手機控制';

@@ -955,7 +955,7 @@ void main() {
         'visible answer block 0visible answer block 1visible answer block 2',
         0,
         // 流式消息的结构化 parts 必须随 updateContent 一起送入 notifier：
-        // 列表的高度估算就是从这里读「有几个步骤」的（生产代码同此路径）。
+        // 列表的高度估算就是从这里读“有几个步骤”的（生产代码同此路径）。
         parts: List<MessagePart>.of(parts),
       );
       await tester.pump();
@@ -1488,7 +1488,7 @@ class _CardVisibilityHarnessState extends State<_CardVisibilityHarness> {
             listController: listController,
             messages: widget.messages,
             byGroup: const {},
-            // 本仓库把「是否有文件在处理」作为列表必填门控（上游无此参数）。
+            // 本仓库把“是否有文件在处理”作为列表必填门控（上游无此参数）。
             reasoning: const <String, stream_ctrl.ReasoningData>{},
             reasoningSegments:
                 const <String, List<stream_ctrl.ReasoningSegmentData>>{},

@@ -148,7 +148,7 @@ void main() {
       database: database,
     );
 
-    // 记录解析不出来 → 视作「无本机记录」，记位并返回 0。
+    // 记录解析不出来 → 视作“无本机记录”，记位并返回 0。
     expect(written, 0);
     expect(
       await database.readState(DeviceLedgerDatabase.lastAppliedRunKey),

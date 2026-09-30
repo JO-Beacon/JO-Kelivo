@@ -319,7 +319,7 @@ void main() {
 
   test('keeps an empty-text trailing part as the turn signature', () {
     // Gemini 3 把整轮的签名挂在一个正文为空的尾部 part 上。
-    // 判据是「有 text 这个键」，不是「正文非空」；反过来，只有签名、
+    // 判据是“有 text 这个键”，不是“正文非空”；反过来，只有签名、
     // 完全没有 text 键的 part 不能当正文签名用 —— 内置工具轮次的
     // toolCall／toolResponse 就长这样，误收会把它们的签名回放到正文上。
     final decoder = GoogleStreamDecoder(persistThoughtSigs: true);

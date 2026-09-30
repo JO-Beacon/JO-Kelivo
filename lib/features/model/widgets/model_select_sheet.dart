@@ -267,7 +267,7 @@ Future<void> showModelSelectSheet(
     initialModelId: resolved.modelId,
     // 关掉独立模型时本对话无法单独指定，整行不显示。
     allowInherit: perChat,
-    // 本对话没单独指定时，勾落在「跟随」这一行上。
+    // 本对话没单独指定时，勾落在“跟随”这一行上。
     inheritSelected: perChat && !hasOwnModel,
   );
   if (sel == null) return;
@@ -290,7 +290,7 @@ Future<void> showModelSelectSheet(
 
 /// 打开跟随当前对话的后台任务模型选择器：未指定时回退到当前对话实际使用的模型。
 ///
-/// 标题/摘要这类任务默认跟随对话，让用户看到的是「现在在跟谁说话」的那一档，
+/// 标题/摘要这类任务默认跟随对话，让用户看到的是“现在在跟谁说话”的那一档，
 /// 而不是全局默认，避免选完发现跟实际聊天用的不是同一个模型。
 Future<ModelSelection?> showModelSelectorWithCurrentChatFallback(
   BuildContext context, {
@@ -434,7 +434,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
     SettingsProvider settings,
     AssistantProvider assistantProvider,
   ) {
-    // 勾在「不单独指定」那一行上时，列表里不再有选中项，避免出现两个勾。
+    // 勾在“不单独指定”那一行上时，列表里不再有选中项，避免出现两个勾。
     if (widget.inheritSelected) return '';
     final hasInitial =
         widget.initialProviderKey != null && widget.initialModelId != null;
@@ -1725,10 +1725,10 @@ class _ModelItem {
 // 展平列表的行
 abstract class _ListRow {}
 
-/// 「本对话不单独指定模型」这一行。
+/// “本对话不单独指定模型”这一行。
 ///
 /// 显示的是实际上会被用到的那一档模型（助手的，或助手没设时的全局默认），
-/// 让用户在点之前就知道会换成什么，而不是一个看不出结果的「跟随助手」。
+/// 让用户在点之前就知道会换成什么，而不是一个看不出结果的“跟随助手”。
 class _InheritRow extends _ListRow {
   _InheritRow({
     required this.modelName,
@@ -1874,12 +1874,12 @@ Future<ModelSelection?> _showDesktopModelSelector(
   );
 }
 
-/// 构造「本对话不单独指定模型」这一行；取不到可显示的模型时返回 null（整行不显示）。
+/// 构造“本对话不单独指定模型”这一行；取不到可显示的模型时返回 null（整行不显示）。
 _InheritRow? _buildInheritRow(BuildContext context, {required bool selected}) {
   final l10n = AppLocalizations.of(context)!;
   final settings = context.read<SettingsProvider>();
   final assistant = context.read<AssistantProvider>().currentAssistant;
-  // 会话传 null：拿的就是「不单独指定时实际会用到的那一档」。
+  // 会话传 null：拿的就是“不单独指定时实际会用到的那一档”。
   final info = getModelDisplayInfo(settings, assistant: assistant);
   final providerKey = info.providerKey;
   final modelId = info.modelId;
@@ -1999,7 +1999,7 @@ class _DesktopModelSelectDialogBodyState
     SettingsProvider settings,
     AssistantProvider assistantProvider,
   ) {
-    // 勾在「不单独指定」那一行上时，列表里不再有选中项，避免出现两个勾。
+    // 勾在“不单独指定”那一行上时，列表里不再有选中项，避免出现两个勾。
     if (widget.inheritSelected) return '';
     final hasInitial =
         widget.initialProviderKey != null && widget.initialModelId != null;

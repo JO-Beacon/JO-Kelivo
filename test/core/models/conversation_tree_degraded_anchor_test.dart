@@ -3,8 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/models/conversation_tree.dart';
 
 /// 契约 §4.3 修订与 §8 验收不变量：
-/// 「删除或切换后，任何从根可达的消息必须仍然可见：要么在活动路径上，
-/// 要么其直接父消息仍是分叉锚点。」
+/// “删除或切换后，任何从根可达的消息必须仍然可见：要么在活动路径上，
+/// 要么其直接父消息仍是分叉锚点。”
 void expectVisible(ConversationTree tree, String messageId) {
   expect(
     tree.edges.containsKey(messageId),
@@ -28,7 +28,7 @@ void expectVisible(ConversationTree tree, String messageId) {
 /// 契约 §4.3 场景树：m0 ← second-m1 ← {nested-m2, sib-m2}。
 ///
 /// second 在锚点 second-m1 上停留（尖端即锚点），nested 与 sib 从锚点
-/// 分叉。活动历史经 second → nested，使「删除当前分支」的回退目标为
+/// 分叉。活动历史经 second → nested，使“删除当前分支”的回退目标为
 /// second（复现用户经由小地图切换的真实路径）。
 ConversationTree buildNestedAnchorTree() {
   var tree = ConversationTree.linear(
@@ -272,7 +272,7 @@ void main() {
       final after = tree.deleteMessageNode('c-m2');
 
       // 契约 §4.4 修订：目标即活动末端，没有血脉可保，m1 下全部分支
-      // （b 侧与 c 侧含 c1/c2 子分支）一并删除，与「删除所有分支」一致。
+      // （b 侧与 c 侧含 c1/c2 子分支）一并删除，与“删除所有分支”一致。
       expect(after.branches.keys, {'root'});
       expect(after.branches['root']?.tipMessageId, 'm1');
       expect(after.activePath(), const ['m0', 'm1']);

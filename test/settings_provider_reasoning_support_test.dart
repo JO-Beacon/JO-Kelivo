@@ -234,7 +234,7 @@ void main() {
           await settings.setTranslateGenerationThinkingEnabled(true);
           await settings.setOcrGenerationThinkingEnabled(true);
 
-          // 全局思考预算已废弃：助手没设档位就是「自动」，不再有第二处兜底。
+          // 全局思考预算已废弃：助手没设档位就是“自动”，不再有第二处兜底。
           // 备份里残留的 thinking_budget_v1 也不再被 SettingsProvider 读取。
           expect(
             settings.summaryGenerationReasoningFor(null),

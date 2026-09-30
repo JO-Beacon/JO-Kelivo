@@ -11,8 +11,8 @@ import 'package:Kelivo/theme/app_font_weights.dart';
 /// 多选删除底栏：始终只呈现一个删除按钮。
 ///
 /// 勾选里含分支节点时，删除会收拢所选目标所属的分叉、仅保留活动血脉，
-/// 按钮文案随之改为「删除此分支节点」以提示这一语义；不含分支节点时
-/// 为普通的「删除」。原先并列的「删除所有分支」入口已移除——它的作用
+/// 按钮文案随之改为“删除此分支节点”以提示这一语义；不含分支节点时
+/// 为普通的“删除”。原先并列的“删除所有分支”入口已移除——它的作用
 /// 范围完全由树结构决定、与勾选内容无关，多选并不能带来任何选择余地。
 class ChatSelectionDeleteBar extends StatelessWidget {
   const ChatSelectionDeleteBar({

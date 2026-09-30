@@ -180,7 +180,7 @@ void main() {
             ),
           ],
           // 兄弟分支表为空（锚点已降级为单子），但树里它仍是分支节点，
-          // 菜单不能再退回成「删除此消息」。
+          // 菜单不能再退回成“删除此消息”。
           branchNodeMessageIds: const <String>{'degraded-branch'},
           onEditMessage: (_) {},
         ),

@@ -213,7 +213,7 @@ void main() {
     expect(settings.wideChatLayout, isFalse);
     // 超长粘贴转文件：本仓库默认**关闭**（产品决定，勿改）。
     // 上游 Kelivo 该项默认开启；本仓库刻意不同，不得按
-    // 「与上游分歧默认换成上游」的口径改回去。
+    // “与上游分歧默认换成上游”的口径改回去。
     // 断言引用具名常量，改默认值必须同时改常量与这条断言。
     expect(
       settings.longPasteAsFile,
@@ -336,7 +336,7 @@ void main() {
       final settings = SettingsProvider(BusinessPreferences(repository));
       await settings.loaded;
 
-      // 全新偏好（没有任何已存值）时必须落到「关闭」。
+      // 全新偏好（没有任何已存值）时必须落到“关闭”。
       expect(settings.longPasteAsFile, isFalse);
       // 阈值常量本身与上游一致，差异只在默认开关状态。
       expect(

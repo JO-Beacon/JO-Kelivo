@@ -77,11 +77,11 @@ void main() {
     expect(messageStyle, findsOneWidget);
     expect(find.text('Haptics'), findsOneWidget);
 
-    // 本仓库把「自动重试」收在「行为与启动」子页面里，首屏不直接给入口
+    // 本仓库把“自动重试”收在“行为与启动”子页面里，首屏不直接给入口
     //（上游后来把它提到了首屏，属本仓库尚未同步的布局差异）。
     expect(find.text('Auto Retry'), findsNothing);
     // 上游改用 defaultTargetPlatform 后，测试环境（android）会渲染移动专属行，
-    // 「行为与启动」可能被挤出视口；先确保可见再点击。
+    // “行为与启动”可能被挤出视口；先确保可见再点击。
     final behaviorRow = find.text('Behavior & startup');
     await tester.ensureVisible(behaviorRow);
     await tester.pumpAndSettle();
@@ -129,7 +129,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(thinkingTitle, findsOneWidget);
       expect(find.text('Show Tool Cards'), findsOneWidget);
-      // 本仓库没有上游那个「问号图标 + 悬停提示」控件（MemoryTipIcon）；
+      // 本仓库没有上游那个“问号图标 + 悬停提示”控件（MemoryTipIcon）；
       // 开关行的说明文字由 _iosSwitchRow 的 subtitle 直接渲染。
       expect(
         find.text('When off, thinking-process cards are hidden in chat'),
@@ -185,7 +185,7 @@ void main() {
     expect(find.text('Show Thinking Cards'), findsNothing);
     expect(find.text('Show Tool Cards'), findsNothing);
 
-    // 上游还有一个「编辑助手消息时保留思考/工具卡片」的开关，本仓库**有意不要**
+    // 上游还有一个“编辑助手消息时保留思考/工具卡片”的开关，本仓库**有意不要**
     //（产品 2026-09-16 定：手动编辑面板就是为了取代它）=> 不在此断言。
 
     final toggle = find.text('Paste long text as file');
