@@ -8,6 +8,11 @@ import '../../l10n/app_localizations.dart';
 /// 把地址填对，名字只是便利。
 abstract final class ProviderPreset {
   /// 可选厂商，按展示顺序。键名同时作为默认名称（未本地化的那些）。
+  ///
+  /// 2026-09-30 产品决定：不再列出上游自家的推广／合作渠道
+  /// （AIhubmix、KelivoIN、Tensdaq）。它们的底层支持仍在：手动填写名字与
+  /// 地址依然享受各自的专属处理（推广头部、推理方言、余额查询），只是不
+  /// 出现在预设列表里。SiliconFlow 保留。
   static const List<String> vendorKeys = <String>[
     'OpenAI',
     'Gemini',
@@ -15,13 +20,10 @@ abstract final class ProviderPreset {
     'SiliconFlow',
     'DeepSeek',
     'OpenRouter',
-    'AIhubmix',
     'Aliyun',
     'Zhipu AI',
     'Grok',
     'ByteDance',
-    'KelivoIN',
-    'Tensdaq',
   ];
 
   /// 预设的显示名；只有几个厂商有本地化名字，其余直接用键名。

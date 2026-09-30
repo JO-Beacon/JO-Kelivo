@@ -16,8 +16,28 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test('vendor preset keys are unique and resolve to usable defaults', () {
-    expect(ProviderPreset.vendorKeys, hasLength(13));
-    expect(ProviderPreset.vendorKeys.toSet(), hasLength(13));
+    // 2026-09-30 产品决定：上游自家的推广／合作渠道不再出现在预设列表里。
+    // 逐项写死同时充当门禁：基线升级把它们带回来时这条会失败。
+    expect(ProviderPreset.vendorKeys, const <String>[
+      'OpenAI',
+      'Gemini',
+      'Claude',
+      'SiliconFlow',
+      'DeepSeek',
+      'OpenRouter',
+      'Aliyun',
+      'Zhipu AI',
+      'Grok',
+      'ByteDance',
+    ]);
+    expect(ProviderPreset.vendorKeys.toSet(), hasLength(10));
+    for (final token in const <String>['AIhubmix', 'KelivoIN', 'Tensdaq']) {
+      expect(
+        ProviderPreset.vendorKeys,
+        isNot(contains(token)),
+        reason: '$token 属于上游推广／合作渠道，已按产品决定移出预设列表',
+      );
+    }
     for (final key in ProviderPreset.vendorKeys) {
       final config = ProviderConfig.defaultsFor(key);
       expect(config.baseUrl, isNotEmpty, reason: key);
